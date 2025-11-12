@@ -1,0 +1,99 @@
+/* Estilos personalizados para react-datepicker */
+
+/* Contenedor del calendario - OPACO */
+.react-datepicker {
+  background-color: white !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 0.5rem !important;
+  z-index: 9999 !important;
+}
+
+/* Popper container - asegurar fondo opaco */
+.react-datepicker-popper,
+.react-datepicker-popper-solid {
+  z-index: 9999 !important;
+}
+
+.react-datepicker__month-container {
+  background-color: white !important;
+  z-index: 9999 !important;
+}
+
+/* Header del calendario */
+.react-datepicker__header {
+  background-color: #4F9BB6 !important;
+  border-bottom: none !important;
+  border-radius: 0.5rem 0.5rem 0 0 !important;
+  padding-top: 0.75rem !important;
+}
+
+/* Mes y año */
+.react-datepicker__current-month {
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+}
+
+/* Días de la semana */
+.react-datepicker__day-name {
+  color: white !important;
+  font-weight: 500 !important;
+  font-size: 0.85rem !important;
+}
+
+/* Días */
+.react-datepicker__day {
+  color: #374151 !important;
+  background-color: white !important;
+  border-radius: 0.375rem !important;
+  transition: all 0.2s !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #9CD2D3 !important;
+  color: #114C5F !important;
+}
+
+/* Día seleccionado */
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #4F9BB6 !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+/* Día de hoy */
+.react-datepicker__day--today {
+  font-weight: 600 !important;
+  border: 2px solid #4F9BB6 !important;
+}
+
+/* Días fuera del mes */
+.react-datepicker__day--outside-month {
+  color: #9ca3af !important;
+}
+
+/* Botones de navegación */
+.react-datepicker__navigation {
+  top: 0.75rem !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: white !important;
+}
+
+.react-datepicker__navigation:hover *::before {
+  border-color: #9CD2D3 !important;
+}
+
+/* Triángulo del popper */
+.react-datepicker__triangle {
+  display: none !important;
+}
+
+/* Contenedor del mes ya definido arriba */
+.react-datepicker__month {
+  background-color: white !important;
+  padding: 0.5rem !important;
+}

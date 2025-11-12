@@ -1,0 +1,242 @@
+.date-range-picker-custom {
+  color: #114C5F;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.date-range-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid #9CD2D3;
+  border-radius: 6px;
+  background: white;
+  white-space: nowrap;
+  transition: all 0.2s;
+  overflow: hidden;
+  height: 38px;
+}
+
+.date-range-group:hover {
+  border-color: #4F9BB6;
+}
+
+.date-range-group[data-pressed] {
+  background: #f8f9fa;
+}
+
+.date-range-group[data-focus-within] {
+  outline: 2px solid #4F9BB6;
+  outline-offset: -1px;
+  border-color: #4F9BB6;
+}
+
+.date-input {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.date-segment {
+  padding: 1px 2px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #114C5F;
+  text-align: center;
+  min-width: 14px;
+  flex-shrink: 1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.date-segment[data-placeholder] {
+  color: #9ca3af;
+}
+
+.date-segment:focus {
+  background: #4F9BB6;
+  color: white;
+  outline: none;
+}
+
+.date-separator {
+  padding: 0 6px;
+  color: #6b7280;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+[slot=end] {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.calendar-button {
+  background: #4F9BB6;
+  color: white;
+  border-radius: 4px;
+  border: none;
+  margin-left: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.calendar-button:hover {
+  background: #4A6EB0;
+}
+
+.calendar-button[data-focus-visible] {
+  outline: 2px solid #4F9BB6;
+  outline-offset: 2px;
+}
+
+.date-popover {
+  background: white;
+  border: 1px solid #9CD2D3;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  max-width: unset;
+}
+
+.date-dialog {
+  padding: 20px;
+  outline: none;
+}
+
+.range-calendar {
+  width: 100%;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calendar-heading {
+  font-size: 16px;
+  font-weight: 600;
+  color: #114C5F;
+  margin: 0;
+}
+
+.nav-button {
+  background: transparent;
+  border: 1px solid #9CD2D3;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #114C5F;
+  transition: all 0.2s;
+}
+
+.nav-button:hover {
+  background: #f0f9ff;
+  border-color: #4F9BB6;
+}
+
+.nav-button[data-focus-visible] {
+  outline: 2px solid #4F9BB6;
+  outline-offset: 2px;
+}
+
+.nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.calendar-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.calendar-grid thead tr {
+  margin-bottom: 8px;
+}
+
+.calendar-grid th {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.calendar-cell {
+  width: 40px;
+  height: 40px;
+  text-align: center;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #114C5F;
+  position: relative;
+}
+
+.calendar-cell[data-outside-month] {
+  color: #d1d5db;
+}
+
+.calendar-cell[data-disabled] {
+  color: #d1d5db;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.calendar-cell:hover:not([data-disabled]) {
+  background: #f0f9ff;
+}
+
+.calendar-cell[data-selected] {
+  background: #4F9BB6;
+  color: white;
+}
+
+.calendar-cell[data-selection-start] {
+  background: #4F9BB6;
+  color: white;
+  border-radius: 8px 0 0 8px;
+}
+
+.calendar-cell[data-selection-end] {
+  background: #4F9BB6;
+  color: white;
+  border-radius: 0 8px 8px 0;
+}
+
+.calendar-cell[data-selection-start][data-selection-end] {
+  border-radius: 8px;
+}
+
+.calendar-cell[data-focus-visible] {
+  outline: 2px solid #4F9BB6;
+  outline-offset: -2px;
+}
+
+.calendar-cell[data-hovered]:not([data-selected]) {
+  background: #e0f2fe;
+}
