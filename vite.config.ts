@@ -16,6 +16,6 @@ export default defineConfig({
   },
   server: {
     host: true, // 👈 permite acceso desde la red
-    port: 3000,
+    port: 8000,
   },
 })
