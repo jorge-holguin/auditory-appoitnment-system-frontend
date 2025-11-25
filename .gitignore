@@ -15,6 +15,7 @@ dist-ssr
 # .env
 .env
 .env.template
+.env*
 
 # Editor directories and files
 .vscode/*
