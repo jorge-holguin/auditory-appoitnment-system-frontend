@@ -12,6 +12,8 @@ interface EstadoPaqueteSelectorProps {
   label?: string
 }
 
+const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
+
 export function EstadoPaqueteSelector({ value, onChange, label = "Estado del Paquete" }: EstadoPaqueteSelectorProps) {
   const [estados, setEstados] = useState<EstadoPaquete[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,7 +23,7 @@ export function EstadoPaqueteSelector({ value, onChange, label = "Estado del Paq
     const fetchEstados = async () => {
       try {
         setLoading(true)
-        const response = await fetch("http://192.168.0.252:9004/interoperabilidadsis/api/v1/estadoPaquete")
+        const response = await fetch(`${API_INTEROP_URL}/estadoPaquete`)
         const result = await response.json()
         
         if (result.success) {

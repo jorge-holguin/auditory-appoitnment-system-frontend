@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { RevisionAtencionModal } from "./RevisionAtencionModal"
+import { aprobarCita } from "@/services/citaService"
 
 interface CitaContext {
   paciente: string
@@ -22,21 +23,39 @@ interface PdfReviewModalProps {
   onClose: () => void
   citaId: string
   citaContext: CitaContext
-  onAprobar: () => void
+  onAprobar?: () => void
+  onRefresh?: () => void
 }
 
-export function PdfReviewModal({ open, onClose, citaId, citaContext, onAprobar }: PdfReviewModalProps) {
+const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
+
+export function PdfReviewModal({ open, onClose, citaId, citaContext, onAprobar, onRefresh }: PdfReviewModalProps) {
   const [loading, setLoading] = useState(false)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
-  const pdfUrl = `http://192.168.0.252:9011/api/reporte/fua?citaId=${citaId}`
+  const [error, setError] = useState<string | null>(null)
+  const pdfUrl = `${API_CITAS_URL}/reporte/fua?citaId=${citaId}`
 
   const handleAprobar = async () => {
     setLoading(true)
+    setError(null)
     try {
-      await onAprobar()
+      // Llamar a la API para cambiar el estado a APROBADO (3)
+      await aprobarCita(citaId)
+      
+      // Llamar al callback opcional
+      if (onAprobar) {
+        onAprobar()
+      }
+      
+      // Refrescar la lista si se proporciona el callback
+      if (onRefresh) {
+        onRefresh()
+      }
+      
       onClose()
     } catch (error) {
       console.error("Error al aprobar:", error)
+      setError("Error al aprobar la cita. Por favor, inténtelo de nuevo.")
     } finally {
       setLoading(false)
     }
@@ -46,11 +65,16 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, onAprobar }
     setShowRevisionModal(true)
   }
 
-  const handleSaveObservations = (observations: any[]) => {
+  const handleSaveObservations = async (observations: any[]) => {
     console.log("Observaciones guardadas:", observations)
     setShowRevisionModal(false)
+    
+    // Refrescar la lista si se proporciona el callback
+    if (onRefresh) {
+      onRefresh()
+    }
+    
     onClose()
-    // Aquí iría la lógica para guardar las observaciones en la API
   }
 
   return (
@@ -69,6 +93,13 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, onAprobar }
             title={`FUA ${citaId}`}
           />
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
 
         <div className="flex gap-4 pt-4 border-t">
           <Button
@@ -107,6 +138,7 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, onAprobar }
         citaId={citaId}
         citaContext={citaContext}
         onSave={handleSaveObservations}
+        onRefresh={onRefresh}
       />
     </Dialog>
   )

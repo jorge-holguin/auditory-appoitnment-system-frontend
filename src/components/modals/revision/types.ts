@@ -15,7 +15,7 @@ export interface FieldObservation {
 }
 
 export type HasObservation = (fieldName: string) => boolean
-export type AddObservation = (fieldName: string, originalValue: string) => void
+export type AddObservation = (fieldName: string, originalValue: string) => void | Promise<void>
 
 // -----------------------------
 // Entidades de apoyo diagnóstico y farmacia

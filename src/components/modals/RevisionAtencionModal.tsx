@@ -9,7 +9,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import PatientSidebar from "./revision/PatientSidebar"
 import { LiquidacionesModal } from "./revision/LiquidacionesModal"
 import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection } from "./revision/types"
-import { obtenerAtencionCompleta, obtenerPacienteConFoto } from "@/services/citaService"
+import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita } from "@/services/citaService"
+import { obtenerObservacionesPorCita, crearObservacion, SECCION_IDS } from "@/services/observacionService"
+import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
 // Lazy-load de los Tabs
 const AtencionTab = dynamic(() => import("./revision/tabs/AtencionTab"))
@@ -44,7 +46,8 @@ interface RevisionAtencionModalProps {
   onClose: () => void
   citaId: string
   citaContext: CitaContext
-  onSave: (observations: FieldObservation[]) => void
+  onSave?: (observations: FieldObservation[]) => void
+  onRefresh?: () => void
 }
 
 export function RevisionAtencionModal({
@@ -52,7 +55,8 @@ export function RevisionAtencionModal({
   onClose,
   citaId,
   citaContext,
-  onSave
+  onSave,
+  onRefresh
 }: RevisionAtencionModalProps) {
   const [observations, setObservations] = useState<FieldObservation[]>([])
   const [activeTab, setActiveTab] = useState<TabSection>("atencion")
@@ -99,6 +103,24 @@ export function RevisionAtencionModal({
         fechaNacimiento: formatearFecha(dataPaciente.fechaNacimiento),
         edad: dataPaciente.edad
       })
+
+      // Cargar observaciones existentes
+      const observacionesExistentes = await obtenerObservacionesPorCita(citaId)
+      
+      // Mapear observaciones del backend al formato del componente
+      const observacionesMapeadas: FieldObservation[] = observacionesExistentes.map(obs => {
+        // Buscar el nombre de sección por su ID
+        const sectionEntry = Object.entries(SECCION_IDS).find(([_, id]) => id === obs.idSeccion)
+        const sectionName = sectionEntry ? sectionEntry[0] : `OBSERVACION_seccion_${obs.idSeccion}`
+        
+        return {
+          fieldName: sectionName,
+          originalValue: "",
+          observation: obs.descripcion
+        }
+      })
+      
+      setObservations(observacionesMapeadas)
 
       const data = await obtenerAtencionCompleta(citaId)
       const atencionData: AtencionData = {
@@ -208,7 +230,7 @@ export function RevisionAtencionModal({
   // -------------------------------
   // Funciones de observaciones
   // -------------------------------
-  const handleAddObservation: AddObservation = (fieldName, value) => {
+  const handleAddObservation: AddObservation = async (fieldName, value) => {
     const isSection = fieldName.startsWith("OBSERVACION_")
     const existing = observations.find(o => o.fieldName === fieldName)
     const updated = observations.filter(o => o.fieldName !== fieldName)
@@ -218,6 +240,26 @@ export function RevisionAtencionModal({
       observation: isSection ? value : (existing?.observation || "")
     })
     setObservations(updated)
+
+    // Guardar automáticamente en el backend si es una sección con observación
+    if (isSection && value) {
+      try {
+        const idSeccion = SECCION_IDS[fieldName as keyof typeof SECCION_IDS]
+        if (idSeccion) {
+          const usuarioRegistro = extractDocumentFromToken() || "SISTEMA"
+          await crearObservacion({
+            idCita: citaId,
+            idSeccion,
+            descripcion: value,
+            usuarioRegistro
+          })
+          console.log(`✅ Observación guardada automáticamente para ${fieldName}`)
+        }
+      } catch (error) {
+        console.error("Error al guardar observación automáticamente:", error)
+        // No mostramos error al usuario para no interrumpir el flujo
+      }
+    }
   }
 
   const hasObservation: HasObservation = (fieldName) =>
@@ -248,10 +290,28 @@ export function RevisionAtencionModal({
     }
   }
 
-  const handleConfirmSave = () => {
-    onSave(observations)
-    setShowConfirmDialog(false)
-    onClose()
+  const handleConfirmSave = async () => {
+    try {
+      // Cambiar el estado de la cita a OBSERVADO (4)
+      await observarCita(citaId)
+      
+      // Llamar al callback opcional
+      if (onSave) {
+        onSave(observations)
+      }
+      
+      // Refrescar la lista si se proporciona el callback
+      if (onRefresh) {
+        onRefresh()
+      }
+      
+      setShowConfirmDialog(false)
+      onClose()
+    } catch (error) {
+      console.error("Error al guardar observaciones:", error)
+      setError("Error al guardar las observaciones. Por favor, inténtelo de nuevo.")
+      setShowConfirmDialog(false)
+    }
   }
 
   const getTipoDxBadge = (tipo: string) => {
@@ -346,7 +406,7 @@ export function RevisionAtencionModal({
                     Atención
                   </TabsTrigger>
                   <TabsTrigger value="diagnosticos" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white flex items-center gap-2 text-sm">
-                    Diagnósticos
+                    Diagnósticos y procedimientos
                   </TabsTrigger>
                   <TabsTrigger value="apoyo" className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-2 text-sm">
                     Apoyo Diagnóstico
@@ -447,31 +507,7 @@ export function RevisionAtencionModal({
       <LiquidacionesModal
         open={showLiquidaciones}
         onClose={() => setShowLiquidaciones(false)}
-        atencion={atencion}
-        observations={observations.filter(obs =>
-          [
-            "Liquidacion_CuentaCorriente",
-            "Liquidacion_FechaEmision",
-            "Liquidacion_HoraEmision",
-            "Liquidacion_HistoriaClinica",
-            "Liquidacion_ApellidosNombres",
-            "Liquidacion_TipoPaciente",
-            "Liquidacion_EmpresaAseguradora",
-            "Liquidacion_Origen",
-            "Liquidacion_Consultorio",
-            "Liquidacion_MedicoTratante",
-            "Liquidacion_Diagnostico1",
-            "Liquidacion_Diagnostico2",
-            "Liquidacion_Diagnostico3",
-            "Liquidacion_FechaIngreso",
-            "Liquidacion_NroCama",
-            "Liquidacion_TotalPagar",
-            "OBSERVACION_liquidaciones"
-          ].includes(obs.fieldName)
-        )}
-        onAddObservation={handleAddObservation}
-        hasObservation={hasObservation}
-        getObservationText={getObservationText}
+        citaId={citaId}
       />
     </>
   )

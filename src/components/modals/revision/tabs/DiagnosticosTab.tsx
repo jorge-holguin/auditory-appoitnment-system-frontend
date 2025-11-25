@@ -20,7 +20,7 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
         <CardContent className="p-5">
           <h3 className="font-semibold text-[#114C5F] text-lg mb-4 flex items-center gap-2">
             <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
-            Diagnósticos
+            Diagnósticos de la atención
           </h3>
 
           {atencion.ListadoDiagnosticos?.length ? (

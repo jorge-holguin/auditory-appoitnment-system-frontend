@@ -15,7 +15,7 @@ interface MedicoSelectorProps {
   idEspecialidad?: string
 }
 
-const API_BASE_URL = "http://192.168.0.252:9011/api/cita"
+const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
 
 async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspecialidad: string): Promise<Medico[]> {
   const formatDate = (date: Date) => {
@@ -25,7 +25,7 @@ async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspec
     return `${year}-${month}-${day}`
   }
 
-  const url = `${API_BASE_URL}/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidad=${idEspecialidad}`
+  const url = `${API_CITAS_URL}/cita/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidad=${idEspecialidad}`
 
   try {
     const response = await fetch(url, {

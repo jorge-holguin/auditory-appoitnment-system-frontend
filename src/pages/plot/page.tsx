@@ -1,100 +1,232 @@
-import { useState, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package } from "lucide-react"
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
-import { EspecialidadSelector } from "@/components/selectors/EspecialidadSelector"
-import { EstadoSelector } from "@/components/selectors/EstadoSelector"
+import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
+import { EstadoFuaSelector } from "@/components/selectors/EstadoFuaSelector"
 import { DateRangePickerAria } from "@/components/ui/DateRangePickerAria"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { DateValue } from "@internationalized/date"
+import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse } from "@/services/tramaService"
+import { format } from "date-fns"
+import { parseDate } from "@internationalized/date"
 
-interface TipoAtencion {
-  id: string
-  nombre: string
-}
-
-interface Especialidad {
-  id: string
-  codigo: string
-  descripcion: string
-}
-
-interface EstadoFua {
-  id: string
-  nombre: string
-}
-
-interface Fua {
-  id: number
-  numeroFua: string
-  paciente: string
-  hc: string
-  tipoAtencion: string
-  especialidad: string
-  estado: string
-  fechaAtencion: string
-}
 
 export default function PlotPage() {
+  // Estados para filtros
   const [origen, setOrigen] = useState<string>("todos")
   const [especialidad, setEspecialidad] = useState<string>("todos")
   const [estado, setEstado] = useState<string>("todos")
+  
+  // Inicializar con la fecha de hoy
+  const today = new Date()
+  const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
+  
   const [dateRange, setDateRange] = useState<{ start: DateValue | null; end: DateValue | null }>({
-    start: null,
-    end: null,
+    start: todayParsed,
+    end: todayParsed,
   })
-  const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null)
+  
+  // Estados para datos
+  const [fuas, setFuas] = useState<Fua[]>([])
+  const [loading, setLoading] = useState(false)
   const [cargandoEnvioPaquete, setCargandoEnvioPaquete] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pageSize, setPageSize] = useState<number>(25)
+  const [currentPage, setCurrentPage] = useState<number>(0)
 
-  // Mock data
+  // Estados para el dialog de confirmación del paquete
+  const [showPackageDialog, setShowPackageDialog] = useState(false)
+  const [paqueteGenerado, setPaqueteGenerado] = useState<DescargarZipResponse | null>(null)
+  const [enviandoAlSis, setEnviandoAlSis] = useState(false)
+  
+  // Estados para el dialog de éxito
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [generatedFileName, setGeneratedFileName] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  
+  // Estados para el dialog de descarga
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false)
 
-  const mockFuas: Fua[] = [
-    { id: 1, numeroFua: "FUA-2025-0001", paciente: "GOMEZ PEREZ JUAN CARLOS", hc: "12345678", tipoAtencion: "Consulta", especialidad: "OFTALMOLOGIA", estado: "Pendiente", fechaAtencion: "01/06/2025" },
-    { id: 2, numeroFua: "FUA-2025-0002", paciente: "LOPEZ GARCIA MARIA ELENA", hc: "87654321", tipoAtencion: "Consulta", especialidad: "CARDIOLOGIA", estado: "Proceso", fechaAtencion: "02/06/2025" },
-    { id: 3, numeroFua: "FUA-2025-0003", paciente: "RODRIGUEZ SANCHEZ PEDRO", hc: "11223344", tipoAtencion: "Emergencia", especialidad: "PEDIATRIA", estado: "Validado", fechaAtencion: "03/06/2025" },
-  ]
 
+  // Función para extraer el correlativo del nombre del archivo
+  const obtenerCorrelativo = (nombreArchivo: string, longitud: number = 5): string => {
+    if (!nombreArchivo) return '0'
+    const sinExtension = nombreArchivo.replace(/\.zip$/i, '')
+    const ultimos = sinExtension.slice(-longitud)
+    // Convertir a número para eliminar ceros a la izquierda, luego a string
+    return Number(ultimos).toString()
+  }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && file.name.endsWith(".zip")) {
-      setArchivoSeleccionado(file)
-    } else {
-      alert("Por favor seleccione un archivo .zip")
-      if (fileInputRef.current) fileInputRef.current.value = ""
+  // Cargar FUAs al montar y cuando cambien los filtros
+  useEffect(() => {
+    if (dateRange.start && dateRange.end) {
+      cargarFuas()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origen, especialidad, estado, dateRange])
+
+  const cargarFuas = async () => {
+    if (!dateRange.start || !dateRange.end) {
+      alert("Por favor seleccione un rango de fechas")
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Convertir DateValue a Date y formatear
+      const fechaInicial = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
+      const fechaFinal = format(new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day), "dd-MM-yyyy")
+
+      const params = {
+        fechaInicial,
+        fechaFinal,
+        idOrigen: origen !== "todos" ? origen : "CE",
+        idEstado: estado !== "todos" ? parseInt(estado) : 2,
+        idEspecialidad: especialidad !== "todos" ? especialidad : undefined
+      }
+
+      const data = await listarFuas(params)
+      setFuas(data)
+      setCurrentPage(0)
+    } catch (error) {
+      console.error("Error al cargar FUAs:", error)
+      alert("Error al cargar los datos. Por favor intente nuevamente.")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleEnviarPaquete = async () => {
-    if (!archivoSeleccionado) return
-    
+  const handleGenerarPaquete = async () => {
+    if (!dateRange.start || !dateRange.end) {
+      alert("Por favor seleccione un rango de fechas")
+      return
+    }
+
+    if (especialidad === "todos") {
+      alert("Por favor seleccione una especialidad específica")
+      return
+    }
+
+    // Usar todos los FUAs cargados
+    const idsAtencion = fuas.map(fua => fua.id)
+
+    if (idsAtencion.length === 0) {
+      alert("No hay FUAs para generar el paquete")
+      return
+    }
+
     setCargandoEnvioPaquete(true)
-    // Simular envío
-    setTimeout(() => {
+    try {
+      const fechaInicio = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
+      const fechaFin = format(new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day), "dd-MM-yyyy")
+
+      // Obtener nombre de la especialidad
+      const especialidadNombre = fuas.find(f => f.id === idsAtencion[0])?.especialidad || "ESPECIALIDAD"
+
+      const request: DescargarZipRequest = {
+        idsAtencion,
+        idPaqueteSis: "00004",
+        crearPaqueteDb: true,
+        fechaInicio,
+        fechaFin,
+        especialidad: especialidadNombre
+      }
+
+      const response = await descargarZip(request)
+      
+      // Guardar el paquete generado y mostrar el diálogo de confirmación
+      setPaqueteGenerado(response)
+      setShowPackageDialog(true)
+    } catch (error) {
+      console.error("Error al generar paquete:", error)
+      alert("Error al generar el paquete. Por favor intente nuevamente.")
+    } finally {
       setCargandoEnvioPaquete(false)
-      alert("Paquete enviado exitosamente al SIS")
-      setArchivoSeleccionado(null)
-      if (fileInputRef.current) fileInputRef.current.value = ""
-    }, 2000)
+    }
   }
 
-  const handleGenerarPaquete = () => {
-    alert("Generando paquete...")
-    // Aquí iría la lógica para generar el paquete
+  const handleDescargarPaquete = () => {
+    if (!paqueteGenerado) return
+    
+    descargarBlob(paqueteGenerado.blob, paqueteGenerado.nombreArchivo)
+    // NO cerrar el diálogo para permitir también enviar al SIS
+    
+    // Mostrar diálogo de confirmación de descarga
+    setShowDownloadDialog(true)
   }
 
+  const handleEnviarAlSis = async () => {
+    if (!paqueteGenerado) return
+    
+    setEnviandoAlSis(true)
+    try {
+      // 1. Enviar el ZIP al SIS usando FormData
+      const respuestaSis = await enviarPaqueteAlSis(paqueteGenerado.blob, paqueteGenerado.nombreArchivo)
+      
+      // 2. Extraer el correlativo del nombre del archivo (últimos 5 dígitos sin ceros a la izquierda)
+      // Ejemplo: 0000594720251100036.zip -> 00036 -> 36
+      const idCorrelativo = obtenerCorrelativo(paqueteGenerado.nombreArchivo)
+      
+      // 3. Actualizar el estado del paquete a ENVIADO usando el correlativo
+      await actualizarEstadoPaqueteSis(idCorrelativo, 'ENVIADO')
+      
+      setShowPackageDialog(false)
+      
+      // Mostrar diálogo de éxito con el mensaje del backend
+      setGeneratedFileName(paqueteGenerado.nombreArchivo)
+      
+      if (respuestaSis.estado === 'ok') {
+        setSuccessMessage(`${respuestaSis.mensaje}\n\nEl paquete ${paqueteGenerado.nombreArchivo} (ID Correlativo: ${idCorrelativo}) fue procesado exitosamente y su estado ha sido actualizado a ENVIADO.`)
+      } else {
+        setSuccessMessage(`${respuestaSis.mensaje}\n\nErrores: ${respuestaSis.errores.join(', ')}`)
+      }
+      
+      setShowSuccessDialog(true)
+    } catch (error) {
+      console.error("Error al enviar paquete al SIS:", error)
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
+      
+      // Mostrar error en diálogo en lugar de alert
+      setSuccessMessage(`Error al enviar el paquete al SIS:\n\n${errorMessage}\n\nPor favor intente nuevamente.`)
+      setShowSuccessDialog(true)
+    } finally {
+      setEnviandoAlSis(false)
+    }
+  }
 
   const handleActualizar = () => {
-    alert("Actualizando datos...")
-    // Aquí iría la lógica para recargar los datos
+    cargarFuas()
   }
 
   const handleLimpiarFiltros = () => {
     setOrigen("todos")
     setEspecialidad("todos")
     setEstado("todos")
-    setDateRange({ start: null, end: null })
+    const today = new Date()
+    const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
+    setDateRange({ start: todayParsed, end: todayParsed })
+    setCurrentPage(0)
   }
+
+  const totalPages = Math.max(1, Math.ceil(fuas.length / pageSize) || 1)
+  const safeCurrentPage = Math.min(currentPage, totalPages - 1)
+  const startIndex = safeCurrentPage * pageSize
+  const endIndex = startIndex + pageSize
+  const pageFuas = fuas.slice(startIndex, endIndex)
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -128,7 +260,7 @@ export default function PlotPage() {
               </div>
               
               <div className="col-span-3">
-                <EspecialidadSelector
+                <EspecialidadSimpleSelector
                   value={especialidad}
                   onChange={setEspecialidad}
                   label="Especialidad"
@@ -136,28 +268,41 @@ export default function PlotPage() {
               </div>
               
               <div className="col-span-2">
-                <EstadoSelector
+                <EstadoFuaSelector
                   value={estado}
                   onChange={setEstado}
                   label="Estado"
-                  fase={1}
-                />
-              </div>
-              
-              <div className="col-span-2">
-                <DateRangePickerAria
-                  value={dateRange}
-                  onChange={setDateRange}
-                  label="Fecha"
                 />
               </div>
               
               <div className="col-span-3">
+                <div className="relative">
+                  <DateRangePickerAria
+                    value={dateRange}
+                    onChange={setDateRange}
+                    label="Fecha"
+                  />
+                  <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              
+              <div className="col-span-2">
                 <Button 
                   onClick={handleGenerarPaquete}
-                  className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium"
+                  disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                  className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
                 >
-                  Generar Paquete
+                  {cargandoEnvioPaquete ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Generar Paquete
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -170,17 +315,16 @@ export default function PlotPage() {
                 label="Origen"
               />
               
-              <EspecialidadSelector
+              <EspecialidadSimpleSelector
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
               />
               
-              <EstadoSelector
+              <EstadoFuaSelector
                 value={estado}
                 onChange={setEstado}
                 label="Estado"
-                fase={1}
               />
               
               <DateRangePickerAria
@@ -192,9 +336,20 @@ export default function PlotPage() {
               <div className="col-span-2">
                 <Button 
                   onClick={handleGenerarPaquete}
-                  className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium"
+                  disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                  className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
                 >
-                  Generar Paquete
+                  {cargandoEnvioPaquete ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Generar Paquete
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -207,17 +362,16 @@ export default function PlotPage() {
                 label="Origen"
               />
               
-              <EspecialidadSelector
+              <EspecialidadSimpleSelector
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
               />
               
-              <EstadoSelector
+              <EstadoFuaSelector
                 value={estado}
                 onChange={setEstado}
                 label="Estado"
-                fase={1}
               />
               
               <DateRangePickerAria
@@ -228,9 +382,20 @@ export default function PlotPage() {
               
               <Button 
                 onClick={handleGenerarPaquete}
-                className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium"
+                disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
               >
-                Generar Paquete
+                {cargandoEnvioPaquete ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Generar Paquete
+                  </>
+                )}
               </Button>
             </div>
 
@@ -271,60 +436,242 @@ export default function PlotPage() {
               <table className="w-full">
                 <thead className="bg-gray-100 border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° FUA</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Cuenta</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo Atención</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockFuas.map((fua) => (
-                    <tr key={fua.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{fua.numeroFua}</td>
-                      <td className="px-4 py-3 text-sm">{fua.paciente}</td>
-                      <td className="px-4 py-3 text-sm">{fua.hc}</td>
-                      <td className="px-4 py-3 text-sm">{fua.tipoAtencion}</td>
-                      <td className="px-4 py-3 text-sm">{fua.especialidad}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                            fua.estado === "Validado"
-                              ? "bg-green-100 text-green-800"
-                              : fua.estado === "Proceso"
-                              ? "bg-cyan-100 text-cyan-800"
-                              : fua.estado === "Pendiente"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {fua.estado}
-                        </span>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                        Cargando FUAs...
                       </td>
-                      <td className="px-4 py-3 text-sm">{fua.fechaAtencion}</td>
                     </tr>
-                  ))}
+                  ) : fuas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                        No se encontraron FUAs con los filtros seleccionados
+                      </td>
+                    </tr>
+                  ) : (
+                    pageFuas.map((fua) => (
+                      <tr 
+                        key={fua.id}
+                        className="border-b hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3 text-sm">{(fua as any).idCuenta || fua.id}</td>
+                        <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{(fua as any).tipoAtencion?.trim() || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wide ${
+                              fua.estado === "2" || fua.estado === "PENDIENTE"
+                                ? "bg-green-100 text-green-800"
+                                : fua.estado === "3" || fua.estado === "EN PROCESO"
+                                ? "bg-cyan-100 text-cyan-800"
+                                : fua.estado === "1" || fua.estado === "CERRADO"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {fua.estado === "2" ? "Pendiente" : fua.estado === "3" ? "Validado" : fua.estado === "4" ? "Cerrado" : fua.estado}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{(fua as any).especialidad || 'N/A'}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Paginación */}
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-sm text-[#114C5F]">Mostrando 1-{mockFuas.length} de {mockFuas.length} registros</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled className="border-[#9CD2D3]">
-                Anterior
-              </Button>
-              <Button variant="outline" size="sm" disabled className="border-[#9CD2D3]">
-                Siguiente
-              </Button>
+          {/* Información, selección y paginación */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
+            <div className="flex items-center justify-between">
+              <span>
+                Mostrando {fuas.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, fuas.length)} de {fuas.length} registros
+              </span>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[#114C5F]">Registros por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const newSize = Number(e.target.value) || 25
+                    setPageSize(newSize)
+                    setCurrentPage(0)
+                  }}
+                  className="border border-[#9CD2D3] rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F9BB6]"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[#114C5F] mr-2">
+                  Página {safeCurrentPage + 1} de {totalPages}
+                </span>
+                <Pagination className="w-auto mx-0">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (safeCurrentPage > 0) setCurrentPage(safeCurrentPage - 1)
+                        }}
+                        className={safeCurrentPage === 0 ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLink
+                        isActive
+                        size="default"
+                        className="cursor-default select-none"
+                      >
+                        {safeCurrentPage + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (safeCurrentPage < totalPages - 1) setCurrentPage(safeCurrentPage + 1)
+                        }}
+                        className={safeCurrentPage >= totalPages - 1 ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Diálogo de confirmación del paquete */}
+      <Dialog open={showPackageDialog} onOpenChange={setShowPackageDialog}>
+        <DialogContent className="bg-white sm:max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="rounded-full bg-blue-100 p-3">
+                <Package className="w-8 h-8 text-blue-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl">
+              Paquete Generado
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> ha sido generado exitosamente.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 mt-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 mb-1">ID del Paquete</div>
+              <div className="font-mono text-lg font-semibold text-gray-900">{paqueteGenerado?.idPaquete}</div>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 mb-1">Nombre del archivo</div>
+              <div className="font-mono text-sm font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <Button
+              onClick={handleDescargarPaquete}
+              variant="outline"
+              className="flex-1 border-[#4F9BB6] text-[#4F9BB6] hover:bg-[#4F9BB6] hover:text-white"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Descargar
+            </Button>
+            <Button
+              onClick={handleEnviarAlSis}
+              disabled={enviandoAlSis}
+              className="flex-1 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
+            >
+              {enviandoAlSis ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Enviar al SIS
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación de descarga */}
+      <Dialog open={showDownloadDialog} onOpenChange={setShowDownloadDialog}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="rounded-full bg-green-100 p-3">
+                <Download className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl">
+              Descarga Exitosa
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2 space-y-2">
+              <p>El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> fue descargado exitosamente.</p>
+              <p className="text-sm text-gray-600 mt-2">Puede continuar y enviarlo al SIS si lo desea.</p>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-4">
+            <Button
+              onClick={() => setShowDownloadDialog(false)}
+              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
+            >
+              Aceptar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de éxito */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="bg-white sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="rounded-full bg-green-100 p-3">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl">
+              ¡Operación Exitosa!
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              {successMessage || `El paquete ${generatedFileName} fue procesado con éxito.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-4">
+            <Button
+              onClick={() => setShowSuccessDialog(false)}
+              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
+            >
+              Aceptar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -35,6 +35,8 @@ interface CatalogosContextType {
 
 const CatalogosContext = createContext<CatalogosContextType | undefined>(undefined)
 
+const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
+
 export function CatalogosProvider({ children }: { children: ReactNode }) {
   const [origenes, setOrigenes] = useState<Origen[]>([])
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([])
@@ -52,10 +54,15 @@ export function CatalogosProvider({ children }: { children: ReactNode }) {
     try {
       setLoadingOrigenes(true)
       setErrorOrigenes(null)
-      const response = await fetch("http://192.168.0.252:9004/interoperabilidadsis/api/v1/origen")
+      const response = await fetch(`${API_INTEROP_URL}/origen`)
       const result = await response.json()
       
-      if (result.success) {
+      // Manejar diferentes formatos de respuesta
+      if (Array.isArray(result)) {
+        setOrigenes(result)
+      } else if (result.success && result.data) {
+        setOrigenes(result.data)
+      } else if (result.data) {
         setOrigenes(result.data)
       } else {
         setErrorOrigenes("Error al cargar orígenes")
@@ -72,10 +79,15 @@ export function CatalogosProvider({ children }: { children: ReactNode }) {
     try {
       setLoadingEspecialidades(true)
       setErrorEspecialidades(null)
-      const response = await fetch("http://192.168.0.252:9004/interoperabilidadsis/api/v1/especialidad")
+      const response = await fetch(`${API_INTEROP_URL}/especialidad`)
       const result = await response.json()
       
-      if (result.success) {
+      // Manejar diferentes formatos de respuesta
+      if (Array.isArray(result)) {
+        setEspecialidades(result)
+      } else if (result.success && result.data) {
+        setEspecialidades(result.data)
+      } else if (result.data) {
         setEspecialidades(result.data)
       } else {
         setErrorEspecialidades("Error al cargar especialidades")
@@ -92,10 +104,15 @@ export function CatalogosProvider({ children }: { children: ReactNode }) {
     try {
       setLoadingEstados(true)
       setErrorEstados(null)
-      const response = await fetch(`http://192.168.0.252:9004/interoperabilidadsis/api/v1/estadoAtencion/fase?fase=${fase}`)
+      const response = await fetch(`${API_INTEROP_URL}/estadoAtencion/fase?fase=${fase}`)
       const result = await response.json()
       
-      if (result.success) {
+      // Manejar diferentes formatos de respuesta
+      if (Array.isArray(result)) {
+        setEstadosAtencion(result)
+      } else if (result.success && result.data) {
+        setEstadosAtencion(result.data)
+      } else if (result.data) {
         setEstadosAtencion(result.data)
       } else {
         setErrorEstados("Error al cargar estados")

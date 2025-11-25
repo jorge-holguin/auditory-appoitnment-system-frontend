@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
-import { EspecialidadSelector } from "@/components/selectors/EspecialidadSelector"
+import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
-import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Sun, Moon, Clock } from "lucide-react"
+import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Sun, Moon } from "lucide-react"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
@@ -160,12 +160,32 @@ export default function AuditPage() {
     }
   }
 
+  // Función para convertir el valor numérico de estadoAuditoria a string
+  const getEstadoString = (estadoAuditoria: number | null | undefined): string => {
+    if (estadoAuditoria === null || estadoAuditoria === undefined || estadoAuditoria === 1) {
+      return "PENDIENTE"
+    }
+    switch (estadoAuditoria) {
+      case 2:
+        return "EN_REVISION"
+      case 3:
+        return "APROBADO"
+      case 4:
+        return "OBSERVADO"
+      case 5:
+        return "SUBSANADO"
+      default:
+        return "PENDIENTE"
+    }
+  }
+
   const getEstadoBadge = (estado: string) => {
     const badges = {
       "PENDIENTE": "bg-yellow-100 text-yellow-800",
       "EN_REVISION": "bg-blue-100 text-blue-800",
       "APROBADO": "bg-green-100 text-green-800",
       "OBSERVADO": "bg-orange-100 text-orange-800",
+      "SUBSANADO": "bg-purple-100 text-purple-800",
     }
     return badges[estado as keyof typeof badges] || "bg-gray-100 text-gray-800"
   }
@@ -176,6 +196,7 @@ export default function AuditPage() {
       "EN_REVISION": "En Revisión",
       "APROBADO": "Aprobado",
       "OBSERVADO": "Observado",
+      "SUBSANADO": "Subsanado",
     }
     return labels[estado as keyof typeof labels] || estado
   }
@@ -271,11 +292,10 @@ export default function AuditPage() {
 
             {/* Fila 2 - Columna 2: Especialidad */}
             <div className="relative z-40">
-              <EspecialidadSelector 
+              <EspecialidadSimpleSelector 
                 value={especialidad} 
                 onChange={setEspecialidad}
-                fechaInicio={selectedDate}
-                fechaFin={selectedDate}
+                label="Especialidad"
               />
             </div>
 
@@ -372,8 +392,8 @@ export default function AuditPage() {
                     ) : '-'}
                   </TableCell>
                   <TableCell>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoBadge(atencion.estadoAuditoria || 'PENDIENTE')}`}>
-                      {getEstadoLabel(atencion.estadoAuditoria || 'PENDIENTE')}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoBadge(getEstadoString(atencion.estadoAuditoria as any))}`}>
+                      {getEstadoLabel(getEstadoString(atencion.estadoAuditoria as any))}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -463,6 +483,7 @@ export default function AuditPage() {
             entidadSis: selectedCita.entidadSis
           }}
           onAprobar={handleAprobar}
+          onRefresh={() => cargarCitas(pagination.page)}
         />
       )}
     </div>

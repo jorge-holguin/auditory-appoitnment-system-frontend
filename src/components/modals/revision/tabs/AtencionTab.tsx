@@ -13,48 +13,11 @@ interface Props {
 export default function AtencionTab({ atencion, onAddObservation, hasObservation, getObservationText }: Props) {
   return (
     <div className="space-y-4 pr-2">
-      <Card>
+
+       <Card>
         <CardContent className="p-5 space-y-4">
           <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
-            Información Clínica
-          </h3>
-
-          <div className="space-y-2">
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Motivo de Consulta:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.Motivo || 'No especificado'}</span>
-            </div>
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Tiempo de Enfermedad:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.TiempoEnfermedad || 'No especificado'}</span>
-            </div>
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Antecedentes:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.Antecedente || 'No especificado'}</span>
-            </div>
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Relato de Anamnesis:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.RelatoAnamnesis || 'No especificado'}</span>
-            </div>
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Examen Físico:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.ExamenFisico || 'No especificado'}</span>
-            </div>
-          </div>
-
-          <SectionObservation
-            sectionName="OBSERVACION_informacion_clinica"
-            onAddObservation={onAddObservation}
-            hasObservation={hasObservation('OBSERVACION_informacion_clinica')}
-            getObservationText={getObservationText}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
-            Funciones Vitales
+            Atención de Funciones Vitales
           </h3>
 
           <div className="grid grid-cols-3 gap-3">
@@ -98,6 +61,35 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
       <Card>
         <CardContent className="p-5 space-y-4">
           <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
+            Información Clínica
+          </h3>
+
+          <div className="space-y-2">
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Motivo de Consulta:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.Motivo || 'No especificado'}</span>
+            </div>
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Tiempo de Enfermedad:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.TiempoEnfermedad || 'No especificado'}</span>
+            </div>
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Antecedentes:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.Antecedente || 'No especificado'}</span>
+            </div>
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Relato de Anamnesis:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.RelatoAnamnesis || 'No especificado'}</span>
+            </div>
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Examen Físico:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.ExamenFisico || 'No especificado'}</span>
+            </div>
+          </div>
+        </CardContent>
+
+         <CardContent className="p-5 space-y-4">
+          <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
             Funciones Biológicas
           </h3>
 
@@ -126,28 +118,28 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               <span className="text-sm font-medium text-gray-700">Deposiciones:</span>
               <span className="text-sm text-gray-900 ml-2">{atencion.Deposiciones || 'No especificado'}</span>
             </div>
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Plan Terapéutico:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.PlanTerapeutico || 'No especificado'}</span>
+            </div>
           </div>
 
           <SectionObservation
-            sectionName="OBSERVACION_funciones_biologicas"
+            sectionName="OBSERVACION_Atención_Principal_Motivo_Antecedentes"
             onAddObservation={onAddObservation}
-            hasObservation={hasObservation('OBSERVACION_funciones_biologicas')}
+            hasObservation={hasObservation('OBSERVACION_Atención_Principal_Motivo_Antecedentes')}
             getObservationText={getObservationText}
           />
         </CardContent>
       </Card>
 
+
       <Card>
         <CardContent className="p-5 space-y-4">
           <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
-            Plan Terapéutico y Destino
+            Destino
           </h3>
-
           <div className="space-y-2">
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Plan Terapéutico:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.PlanTerapeutico || 'No especificado'}</span>
-            </div>
             <div className="p-2 rounded">
               <span className="text-sm font-medium text-gray-700">Destino:</span>
               <span className="text-sm text-gray-900 ml-2">{atencion.Destino || 'No especificado'}</span>
@@ -159,9 +151,9 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
           </div>
 
           <SectionObservation
-            sectionName="OBSERVACION_plan_terapeutico"
+            sectionName="OBSERVACION_destino"
             onAddObservation={onAddObservation}
-            hasObservation={hasObservation('OBSERVACION_plan_terapeutico')}
+            hasObservation={hasObservation('OBSERVACION_destino')}
             getObservationText={getObservationText}
           />
         </CardContent>

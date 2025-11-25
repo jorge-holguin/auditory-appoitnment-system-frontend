@@ -5,6 +5,13 @@ import { Label } from "@/components/ui/label"
 import { X, RefreshCw, FilterX } from "lucide-react"
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Paquete {
   idPaqueteSis: number
@@ -42,13 +49,15 @@ export default function PackagesPage() {
   const [totalPaginas, setTotalPaginas] = useState(0)
   const [paginaDetalles, setPaginaDetalles] = useState(0)
   const [totalPaginasDetalles, setTotalPaginasDetalles] = useState(0)
+  const [detalleSeleccionadoObservacion, setDetalleSeleccionadoObservacion] = useState<string | null>(null)
   const tamanio = 10
 
+  const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
   // Fetch paquetes from API
   const fetchPaquetes = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`http://192.168.0.252:9004/interoperabilidadsis/api/v1/paquete-sis?pagina=${paginaActual}&tamanio=${tamanio}`)
+      const response = await fetch(`${API_INTEROP_URL}/paquete-sis?pagina=${paginaActual}&tamanio=${tamanio}`)
       const result = await response.json()
       
       if (result.content) {
@@ -66,7 +75,7 @@ export default function PackagesPage() {
   const fetchDetallesPaquete = async (idPaquete: number) => {
     try {
       setLoadingDetalles(true)
-      const response = await fetch(`http://192.168.0.252:9004/interoperabilidadsis/api/v1/paquete-sis/${idPaquete}/detalle?pagina=${paginaDetalles}&tamanio=${tamanio}`)
+      const response = await fetch(`${API_INTEROP_URL}/paquete-sis/detalles?idPaquete=${idPaquete}&pagina=${paginaDetalles}&tamanio=${tamanio}`)
       const result = await response.json()
       
       if (result.content) {
@@ -177,12 +186,6 @@ export default function PackagesPage() {
                 Buscar
               </Button>
             </div>
-
-            <div className="flex items-end justify-end">
-              <Button variant="destructive">
-                Anular Paquete
-              </Button>
-            </div>
           </div>
 
           {/* Contenido con tabla de paquetes y detalles */}
@@ -281,7 +284,7 @@ export default function PackagesPage() {
               </div>
             </div>
 
-            {/* Tabla de Detalles del Paquete - 4 columnas */}
+            {/* Tabla de Detalles del Paquete - Observaciones solo para OBSERVADO */}
             <div className="lg:col-span-5">
               {paqueteSeleccionado ? (
                 <div className="border rounded-lg overflow-hidden">
@@ -296,7 +299,7 @@ export default function PackagesPage() {
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">N° FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Estado del FUA</th>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Acciones</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observaciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -319,7 +322,9 @@ export default function PackagesPage() {
                               <td className="px-4 py-2 text-xs">
                                 <span
                                   className={`px-2 py-1 rounded text-xs font-semibold ${
-                                    detalle.estado === "ENVIADO"
+                                    detalle.estado === "OBSERVADO"
+                                      ? "bg-red-100 text-red-800"
+                                      : detalle.estado === "ENVIADO"
                                       ? "bg-blue-100 text-blue-800"
                                       : detalle.estado === "CREADO"
                                       ? "bg-yellow-100 text-yellow-800"
@@ -330,9 +335,18 @@ export default function PackagesPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-2 text-xs">
-                                <Button size="sm" variant="ghost" className="h-6 px-2">
-                                  Ver
-                                </Button>
+                                {detalle.estado === "OBSERVADO" && detalle.observacion ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs text-red-700 hover:text-red-800"
+                                    onClick={() => setDetalleSeleccionadoObservacion(detalle.observacion)}
+                                  >
+                                    Ver observaciones
+                                  </Button>
+                                ) : (
+                                  <span className="text-[11px] text-gray-400">Sin observaciones</span>
+                                )}
                               </td>
                             </tr>
                           ))
@@ -382,6 +396,29 @@ export default function PackagesPage() {
           </div>
         </div>
       </div>
+
+      {/* Dialog de observaciones de detalle */}
+      <Dialog
+        open={!!detalleSeleccionadoObservacion}
+        onOpenChange={(open) => !open && setDetalleSeleccionadoObservacion(null)}
+      >
+        <DialogContent className="bg-white sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base">Observaciones del FUA</DialogTitle>
+            <DialogDescription className="text-sm text-gray-700 whitespace-pre-line">
+              {detalleSeleccionadoObservacion}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => setDetalleSeleccionadoObservacion(null)}
+              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white px-4 py-1 text-sm"
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
