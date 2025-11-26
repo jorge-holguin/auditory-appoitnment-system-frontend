@@ -14,8 +14,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom'],
   },
-  server: {
-    host: true, // 👈 permite acceso desde la red
-    port: 8000,
-  },
 })
