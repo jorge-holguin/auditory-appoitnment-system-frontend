@@ -2,6 +2,51 @@ import { format } from "date-fns"
 
 const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
 
+/**
+ * Convierte el estado de auditoría string a número
+ */
+function getEstadoNumero(estadoAuditoria: string): number {
+  switch (estadoAuditoria) {
+    case "PENDIENTE":
+      return 1
+    case "EN_REVISION":
+      return 2
+    case "APROBADO":
+      return 3
+    case "OBSERVADO":
+      return 4
+    case "SUBSANADO":
+      return 5
+    default:
+      return 1
+  }
+}
+
+/**
+ * Convierte el estado de auditoría numérico a string
+ * Acepta tanto números como strings
+ */
+export function getEstadoString(estadoAuditoria: number | string | null | undefined): string {
+  // Convertir a número si es string
+  const estado = typeof estadoAuditoria === 'string' ? parseInt(estadoAuditoria, 10) : estadoAuditoria
+  
+  if (estado === null || estado === undefined || isNaN(estado) || estado === 1) {
+    return "PENDIENTE"
+  }
+  switch (estado) {
+    case 2:
+      return "EN_REVISION"
+    case 3:
+      return "APROBADO"
+    case 4:
+      return "OBSERVADO"
+    case 5:
+      return "SUBSANADO"
+    default:
+      return "PENDIENTE"
+  }
+}
+
 export interface Especialidad {
   idEspecialidad: string
   nombre: string
@@ -86,6 +131,11 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
   if (turnoConsulta && turnoConsulta !== "TODOS") {
     queryParams.append("turnoConsulta", turnoConsulta)
   }
+  if (estadoAuditoria && estadoAuditoria !== "todos") {
+    // Convertir el estado string a número para el API
+    const estadoNum = getEstadoNumero(estadoAuditoria)
+    queryParams.append("estadoAuditoria", estadoNum.toString())
+  }
 
   const url = `${API_CITAS_URL}/cita/buscar?${queryParams.toString()}`
 
@@ -102,17 +152,6 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
     }
 
     const data = await response.json()
-    
-    // Filtrar por estadoAuditoria si se especifica
-    if (estadoAuditoria && estadoAuditoria !== "todos" && data.content) {
-      data.content = data.content.filter((cita: Cita) => {
-        // Si la cita no tiene estadoAuditoria, asumimos que es PENDIENTE
-        const estado = cita.estadoAuditoria || "PENDIENTE"
-        return estado === estadoAuditoria
-      })
-      data.totalElements = data.content.length
-      data.totalPages = Math.ceil(data.content.length / size)
-    }
     
     // Asignar estadoAuditoria PENDIENTE a las citas que no lo tengan
     if (data.content) {
@@ -151,6 +190,37 @@ export async function obtenerDetalleCita(citaId: string): Promise<any> {
     return data
   } catch (error) {
     console.error("Error en obtenerDetalleCita:", error)
+    throw error
+  }
+}
+
+/**
+ * Busca una cita específica por su ID
+ * Usa el endpoint: /api/cita/{citaId}
+ */
+export async function buscarCitaPorId(citaId: string): Promise<Cita> {
+  const url = `${API_CITAS_URL}/cita/${citaId}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "application/json"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al buscar cita por ID: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    // Asignar estadoAuditoria PENDIENTE si no lo tiene
+    return {
+      ...data,
+      estadoAuditoria: data.estadoAuditoria || "PENDIENTE"
+    }
+  } catch (error) {
+    console.error("Error en buscarCitaPorId:", error)
     throw error
   }
 }

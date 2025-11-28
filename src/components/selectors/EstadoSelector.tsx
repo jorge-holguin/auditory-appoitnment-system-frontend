@@ -13,7 +13,8 @@ export function EstadoSelector({ value, onChange, label = "Estado" }: EstadoSele
     { value: "PENDIENTE", label: "Pendiente" },
     { value: "EN_REVISION", label: "En Revisión" },
     { value: "APROBADO", label: "Aprobado" },
-    { value: "OBSERVADO", label: "Observado" }
+    { value: "OBSERVADO", label: "Observado" },
+    { value: "SUBSANADO", label: "Subsanado" }
   ]
 
   return (

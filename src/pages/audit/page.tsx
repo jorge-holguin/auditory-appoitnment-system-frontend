@@ -6,9 +6,11 @@ import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
+import { useCatalogos } from "@/contexts/CatalogosContext"
+import { Checkbox } from "@/components/ui/checkbox"
 import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Sun, Moon } from "lucide-react"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
-import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita } from "@/services/citaService"
+import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import "@/styles/datepicker-custom.css"
@@ -30,11 +32,14 @@ const esCustom = {
 registerLocale('es', esCustom)
 
 export default function AuditPage() {
+  const { especialidades } = useCatalogos()
   const [origen, setOrigen] = useState("CE")
   const [especialidad, setEspecialidad] = useState("0019")
   const [estado, setEstado] = useState("PENDIENTE")
   const [medico, setMedico] = useState("todos")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
+  const [citaId, setCitaId] = useState("")
+  const [mostrarBusquedaCita, setMostrarBusquedaCita] = useState(false)
   
   // Inicializar con la fecha actual
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -54,8 +59,42 @@ export default function AuditPage() {
     totalElements: 0
   })
 
+  // Función para buscar cita por ID
+  const buscarPorCitaId = async () => {
+    if (!citaId.trim()) {
+      setError("Por favor ingrese un ID de cita")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const cita = await buscarCitaPorId(citaId.trim())
+      setAtenciones([cita])
+      setPagination({
+        page: 0,
+        size: 1,
+        totalPages: 1,
+        totalElements: 1
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al buscar la cita")
+      console.error("Error al buscar cita por ID:", err)
+      setAtenciones([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Función para cargar citas desde la API
   const cargarCitas = async (page: number = 0) => {
+    // Si hay un ID de cita, buscar por ID en lugar de filtros
+    if (citaId.trim()) {
+      buscarPorCitaId()
+      return
+    }
+
     if (!selectedDate) {
       setError("Por favor seleccione una fecha")
       return
@@ -65,10 +104,15 @@ export default function AuditPage() {
     setError(null)
 
     try {
+      // Usar el idEspecialidadSgh (código SGH) si está disponible en el catálogo
+      const especialidadCatalogo = especialidades.find(e => e.id === especialidad)
+      const especialidadApi = especialidadCatalogo?.idEspecialidadSgh || especialidad
+
       const response: CitaResponse = await buscarCitas({
         desde: selectedDate,
         hasta: selectedDate,
-        especialidad: especialidad !== "todos" ? especialidad : undefined,
+        // Para el API se debe usar el código SGH (idEspecialidadSgh), por ejemplo 0031 para Anestesiología
+        especialidad: especialidad !== "todos" ? especialidadApi : undefined,
         medico: medico !== "todos" ? medico : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
         estadoAuditoria: estado !== "todos" ? estado : undefined,
@@ -93,11 +137,15 @@ export default function AuditPage() {
 
   // Cargar datos al montar el componente y cuando cambien los filtros
   useEffect(() => {
-    if (selectedDate) {
+    if (citaId.trim()) {
+      // Si hay un ID de cita, buscar por ID
+      buscarPorCitaId()
+    } else if (selectedDate) {
+      // Si no hay ID de cita, buscar por filtros
       cargarCitas(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, especialidad, medico, turno, estado])
+  }, [selectedDate, especialidad, medico, turno, estado, citaId])
 
   const handleActualizar = () => {
     cargarCitas(pagination.page)
@@ -109,6 +157,8 @@ export default function AuditPage() {
     setMedico("todos")
     setTurno("TODOS")
     setEstado("PENDIENTE")
+    setCitaId("")
+    setMostrarBusquedaCita(false)
     setSelectedDate(new Date())
   }
 
@@ -160,34 +210,16 @@ export default function AuditPage() {
     }
   }
 
-  // Función para convertir el valor numérico de estadoAuditoria a string
-  const getEstadoString = (estadoAuditoria: number | null | undefined): string => {
-    if (estadoAuditoria === null || estadoAuditoria === undefined || estadoAuditoria === 1) {
-      return "PENDIENTE"
-    }
-    switch (estadoAuditoria) {
-      case 2:
-        return "EN_REVISION"
-      case 3:
-        return "APROBADO"
-      case 4:
-        return "OBSERVADO"
-      case 5:
-        return "SUBSANADO"
-      default:
-        return "PENDIENTE"
-    }
-  }
 
   const getEstadoBadge = (estado: string) => {
     const badges = {
-      "PENDIENTE": "bg-yellow-100 text-yellow-800",
-      "EN_REVISION": "bg-blue-100 text-blue-800",
-      "APROBADO": "bg-green-100 text-green-800",
-      "OBSERVADO": "bg-orange-100 text-orange-800",
-      "SUBSANADO": "bg-purple-100 text-purple-800",
+      "PENDIENTE": "bg-yellow-100 text-yellow-800 border border-yellow-300",
+      "EN_REVISION": "bg-blue-100 text-blue-800 border border-blue-300",
+      "APROBADO": "bg-green-100 text-green-800 border border-green-300",
+      "OBSERVADO": "bg-red-100 text-red-800 border border-red-300",
+      "SUBSANADO": "bg-purple-100 text-purple-800 border border-purple-300",
     }
-    return badges[estado as keyof typeof badges] || "bg-gray-100 text-gray-800"
+    return badges[estado as keyof typeof badges] || "bg-gray-100 text-gray-800 border border-gray-300"
   }
 
   const getEstadoLabel = (estado: string) => {
@@ -221,6 +253,56 @@ export default function AuditPage() {
 
         {/* Filtros */}
         <div className="mb-8">
+          {/* Checkbox para mostrar búsqueda por ID */}
+          <div className="mb-4 flex items-center space-x-2">
+            <Checkbox 
+              id="mostrar-busqueda-cita"
+              checked={mostrarBusquedaCita}
+              onCheckedChange={(checked) => {
+                setMostrarBusquedaCita(checked as boolean)
+                if (!checked) {
+                  setCitaId("")
+                }
+              }}
+            />
+            <label
+              htmlFor="mostrar-busqueda-cita"
+              className="text-sm font-medium text-[#114C5F] cursor-pointer"
+            >
+              Buscar por ID de Cita
+            </label>
+          </div>
+
+          {/* Búsqueda por ID de Cita */}
+          {mostrarBusquedaCita && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-[#4F9BB6]/5 to-[#9CD2D3]/5 rounded-lg border border-[#9CD2D3]/30">
+              <label htmlFor="filtro-cita-id" className="block text-sm font-medium text-[#114C5F] mb-2">
+                ID de Cita
+              </label>
+              <div className="flex gap-3">
+                <input
+                  id="filtro-cita-id"
+                  type="text"
+                  value={citaId}
+                  onChange={(e) => setCitaId(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && buscarPorCitaId()}
+                  placeholder="Ingrese el ID de la cita (ej: 250184422)"
+                  className="flex-1 px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
+                />
+                <Button 
+                  onClick={buscarPorCitaId}
+                  disabled={!citaId.trim()}
+                  className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white shadow-md"
+                >
+                  Buscar
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Nota: Al buscar por ID de cita, los demás filtros se ignorarán
+              </p>
+            </div>
+          )}
+
           {/* Matriz 3x2 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-50">
             {/* Fila 1 - Columna 1: Fecha */}
@@ -300,15 +382,18 @@ export default function AuditPage() {
             </div>
 
             {/* Fila 3 - Columna 1: Médico */}
-            <div className="relative z-30">
+            {<div className="relative z-30">
               <MedicoSelector
                 value={medico}
                 onChange={setMedico}
                 fechaInicio={selectedDate}
                 fechaFin={selectedDate}
-                idEspecialidad={especialidad}
+                idEspecialidad={
+                  especialidades.find(e => e.id === especialidad)?.idEspecialidadSgh || 
+                  especialidad
+                }
               />
-            </div>
+            </div>}
 
             {/* Fila 3 - Columna 2: Estado */}
             <div className="relative z-20">

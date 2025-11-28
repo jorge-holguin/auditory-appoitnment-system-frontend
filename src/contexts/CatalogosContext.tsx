@@ -9,6 +9,7 @@ interface Origen {
 interface Especialidad {
   id: string
   descripcion: string
+  idEspecialidadSgh?: string
 }
 
 interface EstadoAtencion {
