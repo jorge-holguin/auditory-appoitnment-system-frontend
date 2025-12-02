@@ -25,6 +25,7 @@ interface ComboboxSelectProps {
   required?: boolean
   disabled?: boolean
   className?: string
+  defaultOpen?: boolean
 }
 
 export function ComboboxSelect({
@@ -37,9 +38,10 @@ export function ComboboxSelect({
   emptyMessage = "No se encontraron resultados.",
   required = false,
   disabled = false,
-  className
+  className,
+  defaultOpen = false
 }: ComboboxSelectProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
 
   const selectedOption = options.find(option => option.value === value)
 

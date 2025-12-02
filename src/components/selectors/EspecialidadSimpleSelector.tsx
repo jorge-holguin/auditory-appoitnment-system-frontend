@@ -5,12 +5,14 @@ interface EspecialidadSimpleSelectorProps {
   value: string
   onChange: (value: string) => void
   label?: string
+  defaultOpen?: boolean
 }
 
 export function EspecialidadSimpleSelector({ 
   value, 
   onChange, 
-  label = "Especialidad" 
+  label = "Especialidad",
+  defaultOpen = false
 }: EspecialidadSimpleSelectorProps) {
   const { especialidades, loadingEspecialidades: loading, errorEspecialidades: error } = useCatalogos()
 
@@ -31,6 +33,7 @@ export function EspecialidadSimpleSelector({
       placeholder={loading ? "Cargando..." : error || "Seleccione especialidad"}
       searchPlaceholder="Buscar especialidad..."
       disabled={loading || !!error}
+      defaultOpen={defaultOpen}
     />
   )
 }

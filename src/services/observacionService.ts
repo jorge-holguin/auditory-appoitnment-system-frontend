@@ -91,8 +91,40 @@ export async function crearObservacion(request: CrearObservacionRequest): Promis
 }
 
 /**
+ * Edita una observación existente usando PUT
+ */
+export async function editarObservacion(
+  idObservacion: number,
+  request: CrearObservacionRequest
+): Promise<Observacion> {
+  const url = `${API_CITAS_URL}/observaciones/${idObservacion}`
+
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "accept": "*/*",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(request)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al editar observación: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error en editarObservacion:", error)
+    throw error
+  }
+}
+
+/**
  * Actualiza una observación existente (si el backend lo soporta)
  * Por ahora, creamos una nueva ya que el endpoint solo tiene POST
+ * @deprecated Use editarObservacion instead
  */
 export async function actualizarObservacion(
   idCita: string,

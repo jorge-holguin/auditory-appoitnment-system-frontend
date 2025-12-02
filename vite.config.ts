@@ -14,4 +14,8 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom'],
   },
+  server: {
+    host: "192.168.5.239",
+    port: 3005
+  }
 })

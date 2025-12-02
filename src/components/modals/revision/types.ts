@@ -12,6 +12,7 @@ export interface FieldObservation {
   fieldName: string
   originalValue: string
   observation: string
+  idObservacion?: number // ID de la observación en el backend (para editar)
 }
 
 export type HasObservation = (fieldName: string) => boolean

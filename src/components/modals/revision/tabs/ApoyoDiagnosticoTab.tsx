@@ -127,7 +127,7 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
 
       {/* Ecografía */}
       <Card className="shadow-sm border-l-4 border-l-teal-500">
-        <CardContent className="p-5">
+        <CardContent className="p-5 text-gray-900">
           <h3 className="font-semibold text-[#114C5F] text-lg mb-4 flex items-center gap-2">
             <div className="w-1 h-6 bg-teal-500 rounded-full"></div>
             Exámenes de Ecografía
@@ -136,26 +136,21 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
           {atencion.ListadoExamenesEcografia?.length ? (
             <div className="space-y-2">
               {atencion.ListadoExamenesEcografia.map((examen: any, index: number) => (
-                <div key={index} className="bg-white p-3 rounded-lg border border-teal-200 shadow-sm">
+                <div key={index} className="bg-teal-50 p-3 rounded-lg border border-teal-200 shadow-sm">
                   <div className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500 text-white flex items-center justify-center text-xs font-bold">
-                      {index + 1}
+                      {examen.orden || index + 1}
                     </span>
-                    <div className="flex-1 text-gray-900">
-                      <p className="font-medium">{examen.Nombre}</p>
-                      {examen.Lugar && (
-                        <p className="text-sm text-gray-700 mt-1">
-                          <span className="font-medium">Lugar:</span> {examen.Lugar}
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{examen.nombre || examen.Nombre}</p>
+                      {examen.cantidad && (
+                        <p className="text-sm text-gray-900 mt-1">
+                          <span className="font-medium">Cantidad:</span> {examen.cantidad}
                         </p>
                       )}
-                      {examen.Observacion && (
-                        <p className="text-sm text-gray-700 mt-1">
-                          <span className="font-medium">Observación:</span> {examen.Observacion}
-                        </p>
-                      )}
-                      {examen.Diagnostico && (
-                        <p className="text-sm text-gray-700 mt-1">
-                          <span className="font-medium">Diagnóstico:</span> {examen.Diagnostico}
+                      {examen.cieX && (
+                        <p className="text-sm text-gray-900 mt-1">
+                          <span className="font-medium">CIE-10:</span> {examen.cieX.trim()}
                         </p>
                       )}
                     </div>

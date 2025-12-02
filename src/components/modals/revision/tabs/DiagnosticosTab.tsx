@@ -93,7 +93,7 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
                       <div className="flex-shrink-0">
                         <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
                           <span className="text-purple-700 font-bold text-sm">
-                            {index + 1}
+                            {procedimiento.orden || (index + 1)}
                           </span>
                         </div>
                       </div>
@@ -102,11 +102,16 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">
-                              {procedimiento.descripcion || 'Sin descripción'}
+                              {procedimiento.nombre || 'Sin descripción'}
                             </p>
-                            {procedimiento.codigo && (
+                            {procedimiento.cpms && (
                               <p className="text-sm text-gray-600 mt-1">
-                                <span className="font-medium">Código:</span> {procedimiento.codigo}
+                                <span className="font-medium">CPMS:</span> {procedimiento.cpms}
+                              </p>
+                            )}
+                            {procedimiento.cieX && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="font-medium">CIE-X:</span> {procedimiento.cieX}
                               </p>
                             )}
                           </div>

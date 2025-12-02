@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle } from "lucide-react"
+
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoFuaSelector } from "@/components/selectors/EstadoFuaSelector"
@@ -28,9 +29,9 @@ import { parseDate } from "@internationalized/date"
 
 export default function PlotPage() {
   // Estados para filtros
-  const [origen, setOrigen] = useState<string>("todos")
+  const [origen, setOrigen] = useState<string>("CE")
   const [especialidad, setEspecialidad] = useState<string>("todos")
-  const [estado, setEstado] = useState<string>("todos")
+  const [estado, setEstado] = useState<string>("2")
   
   // Inicializar con la fecha de hoy
   const today = new Date()
@@ -57,6 +58,7 @@ export default function PlotPage() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [generatedFileName, setGeneratedFileName] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [isErrorDialog, setIsErrorDialog] = useState(false)
   
   // Estados para el dialog de descarga
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
@@ -82,6 +84,13 @@ export default function PlotPage() {
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
       alert("Por favor seleccione un rango de fechas")
+      return
+    }
+
+    // No cargar si no hay especialidad seleccionada
+    if (especialidad === "todos") {
+      setFuas([])
+      setCurrentPage(0)
       return
     }
 
@@ -186,12 +195,14 @@ export default function PlotPage() {
       
       setShowPackageDialog(false)
       
-      // Mostrar diálogo de éxito con el mensaje del backend
+      // Mostrar diálogo de resultado con el mensaje del backend
       setGeneratedFileName(paqueteGenerado.nombreArchivo)
       
       if (respuestaSis.estado === 'ok') {
+        setIsErrorDialog(false)
         setSuccessMessage(`${respuestaSis.mensaje}\n\nEl paquete ${paqueteGenerado.nombreArchivo} (ID Correlativo: ${idCorrelativo}) fue procesado exitosamente y su estado ha sido actualizado a ENVIADO.`)
       } else {
+        setIsErrorDialog(true)
         setSuccessMessage(`${respuestaSis.mensaje}\n\nErrores: ${respuestaSis.errores.join(', ')}`)
       }
       
@@ -199,8 +210,11 @@ export default function PlotPage() {
     } catch (error) {
       console.error("Error al enviar paquete al SIS:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-      
-      // Mostrar error en diálogo en lugar de alert
+
+      // Cerrar el diálogo del paquete y mostrar diálogo de error
+      setShowPackageDialog(false)
+      setGeneratedFileName(paqueteGenerado?.nombreArchivo || "")
+      setIsErrorDialog(true)
       setSuccessMessage(`Error al enviar el paquete al SIS:\n\n${errorMessage}\n\nPor favor intente nuevamente.`)
       setShowSuccessDialog(true)
     } finally {
@@ -213,9 +227,9 @@ export default function PlotPage() {
   }
 
   const handleLimpiarFiltros = () => {
-    setOrigen("todos")
+    setOrigen("CE")
     setEspecialidad("todos")
-    setEstado("todos")
+    setEstado("2")
     const today = new Date()
     const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
     setDateRange({ start: todayParsed, end: todayParsed })
@@ -264,6 +278,7 @@ export default function PlotPage() {
                   value={especialidad}
                   onChange={setEspecialidad}
                   label="Especialidad"
+                  defaultOpen={true}
                 />
               </div>
               
@@ -455,7 +470,9 @@ export default function PlotPage() {
                   ) : fuas.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                        No se encontraron FUAs con los filtros seleccionados
+                        {especialidad === "todos" 
+                          ? "Por favor seleccione una especialidad para ver las atenciones"
+                          : "No se encontraron FUAs con los filtros seleccionados"}
                       </td>
                     </tr>
                   ) : (
@@ -630,9 +647,8 @@ export default function PlotPage() {
             <DialogTitle className="text-center text-xl">
               Descarga Exitosa
             </DialogTitle>
-            <DialogDescription className="text-center pt-2 space-y-2">
-              <p>El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> fue descargado exitosamente.</p>
-              <p className="text-sm text-gray-600 mt-2">Puede continuar y enviarlo al SIS si lo desea.</p>
+            <DialogDescription className="text-center pt-2">
+              El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> fue descargado exitosamente. Puede continuar y enviarlo al SIS si lo desea.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-center mt-4">
@@ -646,19 +662,23 @@ export default function PlotPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de éxito */}
+      {/* Dialog de resultado */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className="bg-white sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
-              <div className="rounded-full bg-green-100 p-3">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              <div className={`rounded-full p-3 ${isErrorDialog ? 'bg-red-100' : 'bg-green-100'}`}>
+                {isErrorDialog ? (
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                ) : (
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                )}
               </div>
             </div>
             <DialogTitle className="text-center text-xl">
-              ¡Operación Exitosa!
+              {isErrorDialog ? 'Error al enviar al SIS' : '¡Operación Exitosa!'}
             </DialogTitle>
-            <DialogDescription className="text-center pt-2">
+            <DialogDescription className="text-center pt-2 whitespace-pre-line">
               {successMessage || `El paquete ${generatedFileName} fue procesado con éxito.`}
             </DialogDescription>
           </DialogHeader>

@@ -10,7 +10,7 @@ import PatientSidebar from "./revision/PatientSidebar"
 import { LiquidacionesModal } from "./revision/LiquidacionesModal"
 import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection } from "./revision/types"
 import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita } from "@/services/citaService"
-import { obtenerObservacionesPorCita, crearObservacion, SECCION_IDS } from "@/services/observacionService"
+import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, SECCION_IDS } from "@/services/observacionService"
 import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
 // Lazy-load de los Tabs
@@ -106,23 +106,48 @@ export function RevisionAtencionModal({
 
       // Cargar observaciones existentes
       const observacionesExistentes = await obtenerObservacionesPorCita(citaId)
-      
-      // Mapear observaciones del backend al formato del componente
-      const observacionesMapeadas: FieldObservation[] = observacionesExistentes.map(obs => {
+
+      // Mapear y deduplicar observaciones del backend al formato del componente
+      // Regla: solo una observación por sección (fieldName), tomando la de mayor idObservacion
+      const observacionesPorSeccion = observacionesExistentes.reduce((acc, obs) => {
         // Buscar el nombre de sección por su ID
         const sectionEntry = Object.entries(SECCION_IDS).find(([_, id]) => id === obs.idSeccion)
         const sectionName = sectionEntry ? sectionEntry[0] : `OBSERVACION_seccion_${obs.idSeccion}`
-        
-        return {
-          fieldName: sectionName,
-          originalValue: "",
-          observation: obs.descripcion
+
+        const existente = acc[sectionName]
+        const idActual = obs.idObservacion ?? 0
+        const idExistente = existente?.idObservacion ?? 0
+
+        if (!existente || idActual >= idExistente) {
+          acc[sectionName] = {
+            fieldName: sectionName,
+            originalValue: "",
+            observation: obs.descripcion,
+            idObservacion: obs.idObservacion
+          }
         }
-      })
-      
+
+        return acc
+      }, {} as Record<string, FieldObservation>)
+
+      const observacionesMapeadas: FieldObservation[] = Object.values(observacionesPorSeccion)
+
       setObservations(observacionesMapeadas)
 
       const data = await obtenerAtencionCompleta(citaId)
+
+      const pesoNum = Number(data.atencionc?.peso) || 0
+      const tallaNumCm = Number(data.atencionc?.talla) || 0
+      let imcCalculado = "0"
+
+      if (pesoNum > 0 && tallaNumCm > 0) {
+        const tallaMetros = tallaNumCm / 100
+        const imcValor = tallaMetros > 0 ? pesoNum / (tallaMetros * tallaMetros) : 0
+        if (imcValor > 0) {
+          imcCalculado = imcValor.toFixed(2)
+        }
+      }
+
       const atencionData: AtencionData = {
         // Info básica
         fechaAtencion: formatearFecha(citaContext.fecha),
@@ -132,9 +157,9 @@ export function RevisionAtencionModal({
         temperatura: data.atencionc?.tempe?.toString() || "0",
         presionArterial: data.atencionc?.presion || "0/0",
         frecuenciaCardiaca: data.atencionc?.fc?.toString() || "0",
-        peso: data.atencionc?.peso?.toString() || "0",
-        talla: data.atencionc?.talla?.toString() || "0",
-        imc: data.atencionc?.imc || "0",
+        peso: pesoNum ? pesoNum.toString() : "0",
+        talla: tallaNumCm ? tallaNumCm.toString() : "0",
+        imc: imcCalculado,
 
         // Bloque atención
         Motivo: data.atencionc?.motivo || "",
@@ -180,6 +205,7 @@ export function RevisionAtencionModal({
         // Farmacia
         Farmacia_Diagnostico: "",
         Farmacia_NombreFarmaco: "",
+        Farmacia_IndicacionesGenerales: "",
         ListadoFarmacos: (data.receta || []).map((r: any) => ({
           Nombre: r.nombre || "",
           Cantidad: r.cantidad?.toString() || "",
@@ -234,32 +260,60 @@ export function RevisionAtencionModal({
     const isSection = fieldName.startsWith("OBSERVACION_")
     const existing = observations.find(o => o.fieldName === fieldName)
     const updated = observations.filter(o => o.fieldName !== fieldName)
-    updated.push({
-      fieldName,
-      originalValue: isSection ? "" : value,
-      observation: isSection ? value : (existing?.observation || "")
-    })
-    setObservations(updated)
-
+    
     // Guardar automáticamente en el backend si es una sección con observación
     if (isSection && value) {
       try {
         const idSeccion = SECCION_IDS[fieldName as keyof typeof SECCION_IDS]
         if (idSeccion) {
           const usuarioRegistro = extractDocumentFromToken() || "SISTEMA"
-          await crearObservacion({
+          const requestData = {
             idCita: citaId,
             idSeccion,
             descripcion: value,
             usuarioRegistro
+          }
+          
+          let savedObservation
+          // Si ya existe una observación, usar PUT para editar
+          if (existing?.idObservacion) {
+            savedObservation = await editarObservacion(existing.idObservacion, requestData)
+            console.log(`✅ Observación editada automáticamente para ${fieldName}`)
+          } else {
+            // Si no existe, usar POST para crear
+            savedObservation = await crearObservacion(requestData)
+            console.log(`✅ Observación creada automáticamente para ${fieldName}`)
+          }
+          
+          // Actualizar el estado con el ID de la observación guardada
+          updated.push({
+            fieldName,
+            originalValue: isSection ? "" : value,
+            observation: isSection ? value : (existing?.observation || ""),
+            idObservacion: savedObservation.idObservacion
           })
-          console.log(`✅ Observación guardada automáticamente para ${fieldName}`)
         }
       } catch (error) {
         console.error("Error al guardar observación automáticamente:", error)
-        // No mostramos error al usuario para no interrumpir el flujo
+        // Agregar al estado local aunque falle el guardado
+        updated.push({
+          fieldName,
+          originalValue: isSection ? "" : value,
+          observation: isSection ? value : (existing?.observation || ""),
+          idObservacion: existing?.idObservacion
+        })
       }
+    } else {
+      // Si no es una sección o no hay valor, solo actualizar el estado local
+      updated.push({
+        fieldName,
+        originalValue: isSection ? "" : value,
+        observation: isSection ? value : (existing?.observation || ""),
+        idObservacion: existing?.idObservacion
+      })
     }
+    
+    setObservations(updated)
   }
 
   const hasObservation: HasObservation = (fieldName) =>

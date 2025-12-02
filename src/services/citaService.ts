@@ -85,6 +85,7 @@ export interface BuscarCitasParams {
   medico?: string
   turnoConsulta?: string
   estadoAuditoria?: string // Filtro por estado de auditoría
+  sis?: boolean // Filtrar solo seguros SIS (por defecto true)
   page?: number
   size?: number
 }
@@ -100,6 +101,7 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
     medico,
     turnoConsulta,
     estadoAuditoria,
+    sis = true,
     page = 0,
     size = 20
   } = params
@@ -120,6 +122,7 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
     hasta: hastaStr,
     especialidad: especialidadFormatted,
     estado: '4', // Siempre 4 = Atendido
+    sis: sis.toString(),
     page: page.toString(),
     size: size.toString()
   })

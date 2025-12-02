@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoSelector } from "@/components/selectors/EstadoSelector"
@@ -175,13 +176,18 @@ export default function AuditPage() {
         return
       }
       
-      // Marcar la cita como "En Revisión" al abrirla
-      await marcarEnRevision(citaId)
+      const estadoActual = getEstadoString(cita.estadoAuditoria as any)
+      
+      // Solo marcar como "En Revisión" si NO está en estado SUBSANADO, OBSERVADO o APROBADO
+      if (estadoActual !== "SUBSANADO" && estadoActual !== "OBSERVADO" && estadoActual !== "APROBADO") {
+        await marcarEnRevision(citaId)
+        // Recargar la lista para reflejar el cambio de estado
+        cargarCitas(pagination.page)
+      }
+      
       setSelectedCitaId(citaId)
       setSelectedCita(cita)
       setModalOpen(true)
-      // Recargar la lista para reflejar el cambio de estado
-      cargarCitas(pagination.page)
     } catch (error) {
       console.error("Error al marcar cita en revisión:", error)
       // Aún así, abrir el modal si encontramos la cita
@@ -459,13 +465,11 @@ export default function AuditPage() {
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{atencion.consultorioNombre}</span>
-                      <span className="text-xs text-gray-500">{atencion.consultorio?.trim()}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{atencion.medicoNombre}</span>
-                      <span className="text-xs text-gray-500">{atencion.medico}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -491,15 +495,40 @@ export default function AuditPage() {
                         <Eye className="w-4 h-4 mr-1" />
                         Revisar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRevertir(atencion.citaId)}
-                        className="border-[#4A6EB0] text-[#4A6EB0] hover:bg-[#4A6EB0]/10"
-                      >
-                        <RotateCcw className="w-4 h-4 mr-1" />
-                        Revertir
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-[#4A6EB0] text-[#4A6EB0] hover:bg-[#4A6EB0]/10"
+                            disabled={getEstadoString(atencion.estadoAuditoria as any) === "SUBSANADO"}
+                          >
+                            <RotateCcw className="w-4 h-4 mr-1" />
+                            Revertir
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="border-[#9CD2D3]/60 shadow-xl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-lg font-semibold text-[#114C5F]">
+                              ¿Está seguro de revertir esta atención al estado PENDIENTE?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm text-gray-600">
+                              Esta acción cambiará el estado de auditoría de la atención a PENDIENTE. Podrá volver a modificarla más adelante, pero los cambios actuales de auditoría se verán afectados.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="border-[#9CD2D3] text-[#114C5F] hover:bg-[#9CD2D3]/10">
+                              Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-600 hover:bg-red-700 text-white shadow-md"
+                              onClick={() => handleRevertir(atencion.citaId)}
+                            >
+                              Sí, revertir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -567,6 +596,7 @@ export default function AuditPage() {
             numRef: selectedCita.numRef,
             entidadSis: selectedCita.entidadSis
           }}
+          estadoAuditoria={getEstadoString(selectedCita.estadoAuditoria as any)}
           onAprobar={handleAprobar}
           onRefresh={() => cargarCitas(pagination.page)}
         />
