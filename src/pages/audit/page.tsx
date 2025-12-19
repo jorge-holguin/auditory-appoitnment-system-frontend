@@ -35,7 +35,7 @@ registerLocale('es', esCustom)
 export default function AuditPage() {
   const { especialidades } = useCatalogos()
   const [origen, setOrigen] = useState("CE")
-  const [especialidad, setEspecialidad] = useState("0019")
+  const [especialidad, setEspecialidad] = useState("todos")
   const [estado, setEstado] = useState("PENDIENTE")
   const [medico, setMedico] = useState("todos")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
@@ -101,6 +101,18 @@ export default function AuditPage() {
       return
     }
 
+    // No cargar si no hay especialidad seleccionada
+    if (especialidad === "todos") {
+      setAtenciones([])
+      setPagination({
+        page: 0,
+        size: 20,
+        totalPages: 0,
+        totalElements: 0
+      })
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -154,7 +166,7 @@ export default function AuditPage() {
 
   const handleLimpiarFiltros = () => {
     setOrigen("CE")
-    setEspecialidad("0019")
+    setEspecialidad("todos")
     setMedico("todos")
     setTurno("TODOS")
     setEstado("PENDIENTE")
@@ -444,6 +456,12 @@ export default function AuditPage() {
                         Reintentar
                       </Button>
                     </div>
+                  </TableCell>
+                </TableRow>
+              ) : atenciones.length === 0 && especialidad === "todos" && !citaId.trim() ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-12">
+                    <p className="text-gray-500">Por favor seleccione una especialidad para ver las atenciones</p>
                   </TableCell>
                 </TableRow>
               ) : atenciones.length === 0 ? (

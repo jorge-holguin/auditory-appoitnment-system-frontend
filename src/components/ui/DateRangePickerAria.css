@@ -12,18 +12,21 @@
   max-width: 100%;
   box-sizing: border-box;
   position: relative;
-  padding: 6px 6px 6px 10px;
+  padding: 8px 10px 8px 14px;
   border: 1px solid #9CD2D3;
-  border-radius: 6px;
-  background: white;
+  border-radius: 8px;
+  background: linear-gradient(to bottom, #ffffff, #fafbfc);
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   overflow: hidden;
-  height: 38px;
+  height: 40px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .date-range-group:hover {
   border-color: #4F9BB6;
+  background: linear-gradient(to bottom, #ffffff, #f5f9fa);
+  box-shadow: 0 2px 4px rgba(79, 155, 182, 0.1);
 }
 
 .date-range-group[data-pressed] {
@@ -31,9 +34,10 @@
 }
 
 .date-range-group[data-focus-within] {
-  outline: 2px solid #4F9BB6;
-  outline-offset: -1px;
+  outline: none;
   border-color: #4F9BB6;
+  box-shadow: 0 0 0 3px rgba(79, 155, 182, 0.15), 0 2px 4px rgba(79, 155, 182, 0.1);
+  background: #ffffff;
 }
 
 .date-input {
@@ -45,33 +49,36 @@
 }
 
 .date-segment {
-  padding: 1px 2px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 400;
+  padding: 2px 3px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
   color: #114C5F;
   text-align: center;
-  min-width: 14px;
+  min-width: 18px;
   flex-shrink: 1;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  transition: all 0.15s ease;
 }
 
 .date-segment[data-placeholder] {
   color: #9ca3af;
+  font-weight: 400;
 }
 
 .date-segment:focus {
-  background: #4F9BB6;
+  background: linear-gradient(135deg, #4F9BB6, #3d8aa5);
   color: white;
   outline: none;
+  box-shadow: 0 1px 3px rgba(79, 155, 182, 0.3);
 }
 
 .date-separator {
-  padding: 0 6px;
-  color: #6b7280;
+  padding: 0 8px;
+  color: #4F9BB6;
   flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 [slot=end] {
@@ -80,24 +87,27 @@
 }
 
 .calendar-button {
-  background: #4F9BB6;
+  background: linear-gradient(135deg, #4F9BB6, #3d8aa5);
   color: white;
-  border-radius: 4px;
+  border-radius: 6px;
   border: none;
-  margin-left: 6px;
-  width: 24px;
-  height: 24px;
+  margin-left: 8px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(79, 155, 182, 0.25);
 }
 
 .calendar-button:hover {
-  background: #4A6EB0;
+  background: linear-gradient(135deg, #4A6EB0, #3d5a9e);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(79, 155, 182, 0.35);
 }
 
 .calendar-button[data-focus-visible] {
@@ -108,14 +118,26 @@
 .date-popover {
   background: white;
   border: 1px solid #9CD2D3;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(17, 76, 95, 0.15), 0 8px 16px rgba(0, 0, 0, 0.08);
   padding: 0;
   max-width: unset;
+  animation: popoverFadeIn 0.2s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .date-dialog {
-  padding: 20px;
+  padding: 24px;
   outline: none;
 }
 
@@ -127,36 +149,40 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0f2fe;
 }
 
 .calendar-heading {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: #114C5F;
   margin: 0;
+  text-transform: capitalize;
 }
 
 .nav-button {
-  background: transparent;
+  background: linear-gradient(to bottom, #ffffff, #f5f9fa);
   border: 1px solid #9CD2D3;
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: #114C5F;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .nav-button:hover {
-  background: #f0f9ff;
+  background: linear-gradient(to bottom, #e0f2fe, #d0ebf7);
   border-color: #4F9BB6;
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(79, 155, 182, 0.15);
 }
 
 .nav-button[data-focus-visible] {
@@ -187,14 +213,16 @@
 }
 
 .calendar-cell {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   text-align: center;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #114C5F;
   position: relative;
+  transition: all 0.15s ease;
 }
 
 .calendar-cell[data-outside-month] {
@@ -208,28 +236,41 @@
 }
 
 .calendar-cell:hover:not([data-disabled]) {
-  background: #f0f9ff;
+  background: linear-gradient(135deg, #e0f2fe, #d0ebf7);
+  transform: scale(1.08);
 }
 
 .calendar-cell[data-selected] {
-  background: #4F9BB6;
+  background: linear-gradient(135deg, #4F9BB6, #3d8aa5);
   color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(79, 155, 182, 0.35);
 }
 
 .calendar-cell[data-selection-start] {
-  background: #4F9BB6;
+  background: linear-gradient(135deg, #4F9BB6, #3d8aa5);
   color: white;
-  border-radius: 8px 0 0 8px;
+  font-weight: 600;
+  border-radius: 10px 0 0 10px;
+  box-shadow: 0 2px 6px rgba(79, 155, 182, 0.35);
 }
 
 .calendar-cell[data-selection-end] {
-  background: #4F9BB6;
+  background: linear-gradient(135deg, #4F9BB6, #3d8aa5);
   color: white;
-  border-radius: 0 8px 8px 0;
+  font-weight: 600;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 2px 6px rgba(79, 155, 182, 0.35);
 }
 
 .calendar-cell[data-selection-start][data-selection-end] {
-  border-radius: 8px;
+  border-radius: 10px;
+}
+
+.calendar-cell[data-in-range]:not([data-selection-start]):not([data-selection-end]) {
+  background: linear-gradient(to bottom, #e0f2fe, #d0ebf7);
+  color: #114C5F;
+  border-radius: 0;
 }
 
 .calendar-cell[data-focus-visible] {
@@ -239,4 +280,9 @@
 
 .calendar-cell[data-hovered]:not([data-selected]) {
   background: #e0f2fe;
+}
+
+.calendar-cell[data-hovered][data-in-range]:not([data-selection-start]):not([data-selection-end]) {
+  background: #bfdefa;
+  color: #114C5F;
 }

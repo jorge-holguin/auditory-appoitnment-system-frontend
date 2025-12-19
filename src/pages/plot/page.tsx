@@ -138,6 +138,11 @@ export default function PlotPage() {
       return
     }
 
+    if (idsAtencion.length < 5) {
+      alert("Debe haber al menos 5 atenciones para generar el paquete")
+      return
+    }
+
     setCargandoEnvioPaquete(true)
     try {
       const fechaInicio = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
