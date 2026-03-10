@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: s024-interoperabilidad-frontend
+    restart: unless-stopped
+    ports:
+      - "3005:80"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

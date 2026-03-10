@@ -12,10 +12,10 @@ dist
 dist-ssr
 *.local
 
-# .env
+# .env — el .env real NO se sube al repo; .env.example SÍ
 .env
-.env.example
-.env*
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
