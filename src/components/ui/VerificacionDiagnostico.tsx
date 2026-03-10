@@ -59,7 +59,7 @@ const VerificacionDiagnostico = forwardRef<VerificacionDiagnosticoRef, Verificac
           // Realizar la consulta a la API
           const response = await fetch(
             
-            `${process.env.NEXT_PUBLIC_API_CIEX_URL}/ciex?busqueda=${encodeURIComponent(codigoDiagnostico)}`,
+            `${import.meta.env.VITE_API_CIEX_URL}/ciex?busqueda=${encodeURIComponent(codigoDiagnostico)}`,
             {
               headers: {
                 'Authorization': `Bearer ${authToken}`,

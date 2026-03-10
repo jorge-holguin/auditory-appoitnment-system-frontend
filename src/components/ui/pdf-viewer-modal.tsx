@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Download, Printer, ArrowLeft, FileText, AlertCircle, RefreshCw } from "lucide-react"
 import { downloadMergedPDF, printMergedPDF } from '@/utils/pdfUtils'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 
 interface PDFViewerModalProps {
   open: boolean
@@ -17,7 +17,7 @@ interface PDFViewerModalProps {
 }
 
 export function PDFViewerModal({ open, onClose, pdfUrls, title, patientId }: PDFViewerModalProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [pdfData, setPdfData] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -222,7 +222,7 @@ export function PDFViewerModal({ open, onClose, pdfUrls, title, patientId }: PDF
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => router.push(`/hospitalization/orders/${patientId}`)}
+                onClick={() => navigate(`/hospitalization/orders/${patientId}`)}
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Ir a Órdenes
@@ -231,7 +231,7 @@ export function PDFViewerModal({ open, onClose, pdfUrls, title, patientId }: PDF
             <Button 
               variant="default" 
               size="sm" 
-              onClick={() => router.push('/hospitalization')}
+              onClick={() => navigate('/hospitalization')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver a Hospitalización

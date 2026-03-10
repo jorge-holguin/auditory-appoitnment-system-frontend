@@ -1,6 +1,5 @@
 // components/revision/RevisionAtencionModal.tsx
-import { useState, useEffect } from "react"
-import dynamic from "next/dynamic"
+import React, { useState, useEffect, Suspense } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2, AlertCircle, Receipt, Save, ArrowLeft, CheckCircle, Trash2 } from "lucide-react"
@@ -14,10 +13,10 @@ import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, anula
 import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
 // Lazy-load de los Tabs
-const AtencionTab = dynamic(() => import("./revision/tabs/AtencionTab"))
-const DiagnosticosTab = dynamic(() => import("./revision/tabs/DiagnosticosTab"))
-const ApoyoDiagnosticoTab = dynamic(() => import("./revision/tabs/ApoyoDiagnosticoTab"))
-const FarmaciaTab = dynamic(() => import("./revision/tabs/FarmaciaTab"))
+const AtencionTab = React.lazy(() => import("./revision/tabs/AtencionTab"))
+const DiagnosticosTab = React.lazy(() => import("./revision/tabs/DiagnosticosTab"))
+const ApoyoDiagnosticoTab = React.lazy(() => import("./revision/tabs/ApoyoDiagnosticoTab"))
+const FarmaciaTab = React.lazy(() => import("./revision/tabs/FarmaciaTab"))
 
 interface Patient {
   paciente: string
@@ -543,19 +542,27 @@ export function RevisionAtencionModal({
                 </TabsList>
 
                 <TabsContent value="atencion" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>}>
+                    <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  </Suspense>
                 </TabsContent>
 
                 <TabsContent value="diagnosticos" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>}>
+                    <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  </Suspense>
                 </TabsContent>
 
                 <TabsContent value="apoyo" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-green-500" /></div>}>
+                    <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  </Suspense>
                 </TabsContent>
 
                 <TabsContent value="farmacia" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-purple-500" /></div>}>
+                    <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                  </Suspense>
                 </TabsContent>
               </Tabs>
 
