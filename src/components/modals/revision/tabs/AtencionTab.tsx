@@ -1,16 +1,18 @@
 // components/revision/tabs/AtencionTab.tsx
 import { Card, CardContent } from "@/components/ui/card"
 import { SectionObservation } from "../SharedComponents"
-import type { AtencionData, AddObservation, HasObservation } from "../types"
+import type { AtencionData, AddObservation, HasObservation, GetObservationEstado, DeleteObservation } from "../types"
 
 interface Props {
   atencion: AtencionData
   onAddObservation: AddObservation
   hasObservation: HasObservation
   getObservationText: (fieldName: string) => string
+  getObservationEstado?: GetObservationEstado
+  onDeleteObservation?: DeleteObservation
 }
 
-export default function AtencionTab({ atencion, onAddObservation, hasObservation, getObservationText }: Props) {
+export default function AtencionTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
   return (
     <div className="space-y-4 pr-2">
 
@@ -53,6 +55,8 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_funciones_vitales')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_funciones_vitales')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_funciones_vitales') : undefined}
             />
           </div>
         </CardContent>
@@ -129,6 +133,8 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             onAddObservation={onAddObservation}
             hasObservation={hasObservation('OBSERVACION_Atención_Principal_Motivo_Antecedentes')}
             getObservationText={getObservationText}
+            estado={getObservationEstado?.('OBSERVACION_Atención_Principal_Motivo_Antecedentes')}
+            onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_Atención_Principal_Motivo_Antecedentes') : undefined}
           />
         </CardContent>
       </Card>
@@ -155,6 +161,8 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             onAddObservation={onAddObservation}
             hasObservation={hasObservation('OBSERVACION_destino')}
             getObservationText={getObservationText}
+            estado={getObservationEstado?.('OBSERVACION_destino')}
+            onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_destino') : undefined}
           />
         </CardContent>
       </Card>

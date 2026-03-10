@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Calendar } from '@/components/ui/calendar'
-import { format, isToday, isWithinInterval, parseISO } from 'date-fns'
+import { parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 

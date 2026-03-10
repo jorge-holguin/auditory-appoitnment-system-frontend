@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { DateValue } from "@internationalized/date"
-import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse } from "@/services/tramaService"
+import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse, type ErrorDetalle } from "@/services/tramaService"
 import { format } from "date-fns"
 import { parseDate } from "@internationalized/date"
 
@@ -62,7 +62,9 @@ export default function PlotPage() {
   
   // Estados para el dialog de descarga
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
-
+  
+  // Estados para errores detallados
+  const [errorDetails, setErrorDetails] = useState<ErrorDetalle[] | null>(null)
 
   // Función para extraer el correlativo del nombre del archivo
   const obtenerCorrelativo = (nombreArchivo: string, longitud: number = 5): string => {
@@ -71,6 +73,28 @@ export default function PlotPage() {
     const ultimos = sinExtension.slice(-longitud)
     // Convertir a número para eliminar ceros a la izquierda, luego a string
     return Number(ultimos).toString()
+  }
+
+  // Función para descargar errores como archivo TXT
+  const handleDescargarErrores = () => {
+    if (!errorDetails || errorDetails.length === 0) return
+    
+    let contenido = `ERRORES DETECTADOS AL GENERAR EL PAQUETE\n`
+    contenido += `Paquete: ${generatedFileName}\n`
+    contenido += `Fecha: ${format(new Date(), "dd-MM-yyyy HH:mm:ss")}\n`
+    contenido += `\n${"-".repeat(80)}\n\n`
+    
+    errorDetails.forEach((errorItem, index) => {
+      contenido += `${index + 1}. ID: ${errorItem.id}\n`
+      errorItem.errores.forEach((error, errorIndex) => {
+        contenido += `   ${String.fromCharCode(97 + errorIndex)}) ${error}\n`
+      })
+      contenido += `\n`
+    })
+    
+    const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' })
+    const nombreArchivo = `errores_${generatedFileName.replace('.zip', '')}_${format(new Date(), "yyyyMMdd_HHmmss")}.txt`
+    descargarBlob(blob, nombreArchivo)
   }
 
   // Cargar FUAs al montar y cuando cambien los filtros
@@ -191,24 +215,30 @@ export default function PlotPage() {
       // 1. Enviar el ZIP al SIS usando FormData
       const respuestaSis = await enviarPaqueteAlSis(paqueteGenerado.blob, paqueteGenerado.nombreArchivo)
       
-      // 2. Extraer el correlativo del nombre del archivo (últimos 5 dígitos sin ceros a la izquierda)
-      // Ejemplo: 0000594720251100036.zip -> 00036 -> 36
-      const idCorrelativo = obtenerCorrelativo(paqueteGenerado.nombreArchivo)
-      
-      // 3. Actualizar el estado del paquete a ENVIADO usando el correlativo
-      await actualizarEstadoPaqueteSis(idCorrelativo, 'ENVIADO')
-      
+      // Cerrar el diálogo del paquete
       setShowPackageDialog(false)
       
       // Mostrar diálogo de resultado con el mensaje del backend
       setGeneratedFileName(paqueteGenerado.nombreArchivo)
       
       if (respuestaSis.estado === 'ok') {
+        // 2. Extraer el correlativo del nombre del archivo (últimos 5 dígitos sin ceros a la izquierda)
+        // Ejemplo: 0000594720251100036.zip -> 00036 -> 36
+        const idCorrelativo = obtenerCorrelativo(paqueteGenerado.nombreArchivo)
+        
+        // 3. Actualizar el estado del paquete a ENVIADO usando el correlativo
+        await actualizarEstadoPaqueteSis(idCorrelativo, 'ENVIADO')
+        
         setIsErrorDialog(false)
+        setErrorDetails(null)
         setSuccessMessage(`${respuestaSis.mensaje}\n\nEl paquete ${paqueteGenerado.nombreArchivo} (ID Correlativo: ${idCorrelativo}) fue procesado exitosamente y su estado ha sido actualizado a ENVIADO.`)
       } else {
+        // Error del SIS con detalles
         setIsErrorDialog(true)
-        setSuccessMessage(`${respuestaSis.mensaje}\n\nErrores: ${respuestaSis.errores.join(', ')}`)
+        setErrorDetails(respuestaSis.errores || null)
+        
+        const totalErrores = respuestaSis.errores?.length || 0
+        setSuccessMessage(`${respuestaSis.mensaje}\n\nSe detectaron errores en ${totalErrores} registro(s).`)
       }
       
       setShowSuccessDialog(true)
@@ -220,6 +250,7 @@ export default function PlotPage() {
       setShowPackageDialog(false)
       setGeneratedFileName(paqueteGenerado?.nombreArchivo || "")
       setIsErrorDialog(true)
+      setErrorDetails(null)
       setSuccessMessage(`Error al enviar el paquete al SIS:\n\n${errorMessage}\n\nPor favor intente nuevamente.`)
       setShowSuccessDialog(true)
     } finally {
@@ -669,7 +700,7 @@ export default function PlotPage() {
 
       {/* Dialog de resultado */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="bg-white sm:max-w-md">
+        <DialogContent className={`bg-white ${errorDetails && errorDetails.length > 0 ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}>
           <DialogHeader>
             <div className="flex items-center justify-center mb-4">
               <div className={`rounded-full p-3 ${isErrorDialog ? 'bg-red-100' : 'bg-green-100'}`}>
@@ -681,16 +712,57 @@ export default function PlotPage() {
               </div>
             </div>
             <DialogTitle className="text-center text-xl">
-              {isErrorDialog ? 'Error al enviar al SIS' : '¡Operación Exitosa!'}
+              {isErrorDialog ? 'Errores Detectados al Generar el Paquete' : '¡Operación Exitosa!'}
             </DialogTitle>
             <DialogDescription className="text-center pt-2 whitespace-pre-line">
               {successMessage || `El paquete ${generatedFileName} fue procesado con éxito.`}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center mt-4">
+          
+          {/* Mostrar lista de errores detallados si existen */}
+          {errorDetails && errorDetails.length > 0 && (
+            <div className="mt-4 max-h-[400px] overflow-y-auto border rounded-lg">
+              <div className="bg-gray-50 px-4 py-2 border-b sticky top-0">
+                <h4 className="font-semibold text-sm text-gray-700">Detalle de Errores:</h4>
+              </div>
+              <div className="divide-y">
+                {errorDetails.map((errorItem, index) => (
+                  <div key={errorItem.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-start gap-2">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-600 text-xs font-semibold flex items-center justify-center">
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 mb-1">ID: {errorItem.id}</p>
+                        <ul className="space-y-1">
+                          {errorItem.errores.map((error, errorIndex) => (
+                            <li key={errorIndex} className="text-xs text-gray-600 pl-2 border-l-2 border-red-300">
+                              {error}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className={`flex ${errorDetails && errorDetails.length > 0 ? 'justify-between' : 'justify-center'} gap-3 mt-4`}>
+            {errorDetails && errorDetails.length > 0 && (
+              <Button
+                onClick={handleDescargarErrores}
+                variant="outline"
+                className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Descargar Errores (TXT)
+              </Button>
+            )}
             <Button
               onClick={() => setShowSuccessDialog(false)}
-              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
+              className={`${errorDetails && errorDetails.length > 0 ? 'flex-1' : ''} bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white`}
             >
               Aceptar
             </Button>

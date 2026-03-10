@@ -136,10 +136,15 @@ export async function descargarZip(request: DescargarZipRequest): Promise<Descar
   }
 }
 
+export interface ErrorDetalle {
+  id: string
+  errores: string[]
+}
+
 export interface RespuestaSis {
   estado: string
   mensaje: string
-  errores: string[]
+  errores?: ErrorDetalle[]
 }
 
 /**
@@ -160,15 +165,58 @@ export async function enviarPaqueteAlSis(blob: Blob, nombreArchivo: string): Pro
       // No establecer Content-Type, fetch lo hará automáticamente con el boundary correcto
     })
 
-    if (!response.ok) {
-      throw new Error(`Error al enviar paquete al SIS: ${response.status} ${response.statusText}`)
-    }
+    // Obtener el texto de la respuesta primero
+    const responseText = await response.text()
+    
+    // Intentar parsear como JSON
+    try {
+      // Primero intentar parsear directamente
+      const data: RespuestaSis = JSON.parse(responseText)
+      
+      // Si el servidor responde con error, devolver la respuesta con errores
+      if (!response.ok || data.estado === 'error') {
+        return data
+      }
 
-    const data: RespuestaSis = await response.json()
-    return data
+      return data
+    } catch (jsonError) {
+      // Si no se puede parsear directamente, intentar extraer JSON del texto
+      console.error("Error al parsear respuesta JSON directamente:", jsonError)
+      console.error("Respuesta del servidor:", responseText)
+      
+      // Buscar un objeto JSON dentro del texto (puede tener prefijo como "Error al subir paquete: ")
+      const jsonMatch = responseText.match(/\{.*\}$/s)
+      if (jsonMatch) {
+        try {
+          const extractedData: RespuestaSis = JSON.parse(jsonMatch[0])
+          console.log("JSON extraído exitosamente:", extractedData)
+          
+          // Si el servidor responde con error, devolver la respuesta con errores
+          if (!response.ok || extractedData.estado === 'error') {
+            return extractedData
+          }
+          
+          return extractedData
+        } catch (extractError) {
+          console.error("Error al parsear JSON extraído:", extractError)
+        }
+      }
+      
+      // Si no se puede extraer JSON válido, devolver un objeto de error estructurado
+      return {
+        estado: 'error',
+        mensaje: `Error al procesar la respuesta del servidor: ${responseText.substring(0, 200)}`,
+        errores: []
+      }
+    }
   } catch (error) {
     console.error("Error en enviarPaqueteAlSis:", error)
-    throw error
+    // Devolver un objeto de error estructurado en lugar de lanzar
+    return {
+      estado: 'error',
+      mensaje: error instanceof Error ? error.message : 'Error desconocido al enviar el paquete',
+      errores: []
+    }
   }
 }
 

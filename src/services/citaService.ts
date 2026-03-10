@@ -424,13 +424,14 @@ export interface DetalleLiquidacion {
   descuento: number
   codcpt: string | null
   clasificadorNombre: string
+  ordenId?: string
 }
 
 /**
  * Obtiene el número de cuenta asociado a una cita
  */
 export async function obtenerCuentaPorCita(citaId: string): Promise<number> {
-  const url = `${API_CITAS_URL}/trasnsversal/cuentadet/cuenta/cita/${citaId}`
+  const url = `${API_CITAS_URL}/transversal/cuentadet/cuenta/cita/${citaId}`
 
   try {
     const response = await fetch(url, {
@@ -456,7 +457,7 @@ export async function obtenerCuentaPorCita(citaId: string): Promise<number> {
  * Obtiene el detalle de liquidación de una cuenta
  */
 export async function obtenerDetalleLiquidacion(cuentaId: number): Promise<DetalleLiquidacion[]> {
-  const url = `${API_CITAS_URL}/trasnsversal/cuentadet/cuenta/${cuentaId}/detallado`
+  const url = `${API_CITAS_URL}/transversal/cuentadet/cuenta/${cuentaId}/detallado`
 
   try {
     const response = await fetch(url, {
@@ -480,9 +481,15 @@ export async function obtenerDetalleLiquidacion(cuentaId: number): Promise<Detal
 
 /**
  * Elimina un item de la liquidación
+ * DELETE /api/transversal/cuentadet?cuentaid=X&item=Y&ordenid=Z
  */
-export async function eliminarItemLiquidacion(cuentaId: number, item: string, citaId: string): Promise<void> {
-  const url = `${API_CITAS_URL}/trasnsversal/cuentadet/${cuentaId}/${item}/${citaId}`
+export async function eliminarItemLiquidacion(cuentaId: number, item: string, ordenId: string): Promise<void> {
+  const queryParams = new URLSearchParams({
+    cuentaid: cuentaId.toString(),
+    item: item.trim(),
+    ordenid: ordenId.trim()
+  })
+  const url = `${API_CITAS_URL}/transversal/cuentadet?${queryParams.toString()}`
 
   try {
     const response = await fetch(url, {

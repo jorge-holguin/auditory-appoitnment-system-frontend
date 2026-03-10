@@ -1,9 +1,9 @@
 // components/revision/tabs/DiagnosticosTab.tsx
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, Activity } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { SectionObservation } from "../SharedComponents"
-import type { AtencionData, AddObservation, HasObservation } from "../types"
+import type { AtencionData, AddObservation, HasObservation, GetObservationEstado, DeleteObservation } from "../types"
 
 interface Props {
   atencion: AtencionData
@@ -11,9 +11,11 @@ interface Props {
   hasObservation: HasObservation
   getObservationText: (fieldName: string) => string
   getTipoDxBadge: (tipo: string) => { label: string; className: string }
+  getObservationEstado?: GetObservationEstado
+  onDeleteObservation?: DeleteObservation
 }
 
-export default function DiagnosticosTab({ atencion, onAddObservation, hasObservation, getObservationText, getTipoDxBadge }: Props) {
+export default function DiagnosticosTab({ atencion, onAddObservation, hasObservation, getObservationText, getTipoDxBadge, getObservationEstado, onDeleteObservation }: Props) {
   return (
     <div className="space-y-4 pr-2">
       <Card className="shadow-sm border-l-4 border-l-indigo-500">
@@ -71,6 +73,8 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_diagnosticos')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_diagnosticos')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_diagnosticos') : undefined}
             />
           </div>
         </CardContent>
@@ -140,6 +144,8 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_procedimientos')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_procedimientos')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_procedimientos') : undefined}
             />
           </div>
         </CardContent>

@@ -11,9 +11,9 @@ import {
   Label,
   Popover,
   RangeCalendar,
+  type DateValue,
 } from 'react-aria-components'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { DateValue } from '@internationalized/date'
 import './DateRangePickerAria.css'
 
 interface DateRangePickerProps {
@@ -22,9 +22,12 @@ interface DateRangePickerProps {
   onChange?: (value: { start: DateValue | null; end: DateValue | null }) => void
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TypedDateRangePicker = AriaDateRangePicker as any
+
 export function DateRangePickerAria({ label = 'Fecha', value, onChange }: DateRangePickerProps) {
   return (
-    <AriaDateRangePicker
+    <TypedDateRangePicker
       value={value}
       onChange={onChange}
       className="date-range-picker-custom"
@@ -60,6 +63,6 @@ export function DateRangePickerAria({ label = 'Fecha', value, onChange }: DateRa
           </RangeCalendar>
         </Dialog>
       </Popover>
-    </AriaDateRangePicker>
+    </TypedDateRangePicker>
   )
 }

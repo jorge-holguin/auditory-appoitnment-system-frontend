@@ -163,6 +163,7 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
         citaContext={citaContext}
         onSave={handleSaveObservations}
         onRefresh={onRefresh}
+        citaEstado={estadoAuditoria}
       />
     </Dialog>
   )

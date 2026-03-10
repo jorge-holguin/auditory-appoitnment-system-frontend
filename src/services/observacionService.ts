@@ -7,6 +7,7 @@ export interface Observacion {
   descripcion: string
   fechaRegistro?: string
   usuarioRegistro: string
+  estado?: string // 0=anulada, 1=activa, 2=subsanada
 }
 
 export interface CrearObservacionRequest {
@@ -139,4 +140,28 @@ export async function actualizarObservacion(
     descripcion,
     usuarioRegistro
   })
+}
+
+/**
+ * Anula una observación (cambia estado a 0)
+ * PUT /api/observaciones/{idObservacion}/estado?estado=0&usuario={usuario}
+ */
+export async function anularObservacion(idObservacion: number, usuario: string): Promise<void> {
+  const url = `${API_CITAS_URL}/observaciones/${idObservacion}/estado?estado=0&usuario=${usuario}`
+
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "accept": "*/*"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al anular observación: ${response.status} ${response.statusText}`)
+    }
+  } catch (error) {
+    console.error("Error en anularObservacion:", error)
+    throw error
+  }
 }

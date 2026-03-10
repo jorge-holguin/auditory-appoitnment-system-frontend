@@ -13,10 +13,13 @@ export interface FieldObservation {
   originalValue: string
   observation: string
   idObservacion?: number // ID de la observación en el backend (para editar)
+  estado?: string // 0=anulada, 1=activa, 2=subsanada
 }
 
 export type HasObservation = (fieldName: string) => boolean
 export type AddObservation = (fieldName: string, originalValue: string) => void | Promise<void>
+export type GetObservationEstado = (fieldName: string) => string | undefined
+export type DeleteObservation = (fieldName: string) => void | Promise<void>
 
 // -----------------------------
 // Entidades de apoyo diagnóstico y farmacia

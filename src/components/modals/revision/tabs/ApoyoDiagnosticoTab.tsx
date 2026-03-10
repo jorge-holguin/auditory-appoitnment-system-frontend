@@ -2,16 +2,18 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { FileText } from "lucide-react"
 import { SectionObservation } from "../SharedComponents"
-import type { AtencionData, AddObservation, HasObservation } from "../types"
+import type { AtencionData, AddObservation, HasObservation, GetObservationEstado, DeleteObservation } from "../types"
 
 interface Props {
   atencion: AtencionData
   onAddObservation: AddObservation
   hasObservation: HasObservation
   getObservationText: (fieldName: string) => string
+  getObservationEstado?: GetObservationEstado
+  onDeleteObservation?: DeleteObservation
 }
 
-export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObservation, getObservationText }: Props) {
+export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
   return (
     <div className="space-y-4 pr-2">
       {/* Laboratorio */}
@@ -64,6 +66,8 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_laboratorio')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_laboratorio')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_laboratorio') : undefined}
             />
           </div>
         </CardContent>
@@ -120,6 +124,8 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_rayosx')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_rayosx')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_rayosx') : undefined}
             />
           </div>
         </CardContent>
@@ -171,6 +177,8 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_ecografia')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_ecografia')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_ecografia') : undefined}
             />
           </div>
         </CardContent>

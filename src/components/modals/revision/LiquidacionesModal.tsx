@@ -67,7 +67,7 @@ export function LiquidacionesModal({
     items.forEach(item => {
       if (item.removido) return // Ignorar items removidos
 
-      const clasificador = item.clasificadorNombre.trim()
+      const clasificador = item.clasificadorNombre?.trim() || 'Sin clasificador'
       if (!grupos[clasificador]) {
         grupos[clasificador] = {
           clasificadorNombre: clasificador,
@@ -94,13 +94,13 @@ export function LiquidacionesModal({
 
     setDeleting(true)
     try {
-      // Llamar al endpoint DELETE
-      await eliminarItemLiquidacion(cuentaId, itemToDelete.item.trim(), citaId)
+      // Llamar al endpoint DELETE con ordenId
+      await eliminarItemLiquidacion(cuentaId, itemToDelete.item?.trim() || '', itemToDelete.ordenId?.trim() || '')
       
-      // Marcar como removido en el estado local
+      // Marcar como removido en el estado local (usando item + ordenId para identificar únicamente)
       setItems(prevItems => 
         prevItems.map(item => 
-          item.item === itemToDelete.item ? { ...item, removido: true } : item
+          (item.item === itemToDelete.item && item.ordenId === itemToDelete.ordenId) ? { ...item, removido: true } : item
         )
       )
       
@@ -204,11 +204,11 @@ export function LiquidacionesModal({
                       <tbody>
                         {grupo.items.map((item, itemIndex) => (
                           <tr key={itemIndex} className="border-b hover:bg-gray-50 transition">
-                            <td className="p-3 text-gray-800">{item.item.trim()}</td>
+                            <td className="p-3 text-gray-800">{item.item?.trim() || ''}</td>
                             <td className="p-3 text-gray-800">{item.itemNombre}</td>
                             <td className="p-3 text-center text-gray-800">{item.cantidad}</td>
-                            <td className="p-3 text-right text-gray-800">{item.precio.toFixed(2)}</td>
-                            <td className="p-3 text-right font-semibold text-gray-900">{item.total.toFixed(2)}</td>
+                            <td className="p-3 text-right text-gray-800">S/. {item.precio.toFixed(2)}</td>
+                            <td className="p-3 text-right font-semibold text-gray-900">S/. {item.total.toFixed(2)}</td>
                             <td className="p-3 text-center">
                               <Button
                                 variant="ghost"
@@ -258,7 +258,7 @@ export function LiquidacionesModal({
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
                 <div>
                   <span className="text-sm font-semibold text-gray-600">Item:</span>
-                  <span className="text-sm text-gray-900 ml-2">{itemToDelete.item.trim()}</span>
+                  <span className="text-sm text-gray-900 ml-2">{itemToDelete.item?.trim() || ''}</span>
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-gray-600">Producto:</span>

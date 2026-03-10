@@ -1,11 +1,6 @@
 import { ComboboxSelect, type ComboboxOption } from "@/components/ui/ComboboxSelect"
 import { useCatalogos } from "@/contexts/CatalogosContext"
 
-interface Origen {
-  id: string
-  nombre: string
-}
-
 interface OrigenSelectorProps {
   value: string
   onChange: (value: string) => void

@@ -3,14 +3,14 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2, AlertCircle, Receipt, Save, ArrowLeft, CheckCircle } from "lucide-react"
+import { Loader2, AlertCircle, Receipt, Save, ArrowLeft, CheckCircle, Trash2 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 import PatientSidebar from "./revision/PatientSidebar"
 import { LiquidacionesModal } from "./revision/LiquidacionesModal"
-import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection } from "./revision/types"
-import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita } from "@/services/citaService"
-import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, SECCION_IDS } from "@/services/observacionService"
+import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection, GetObservationEstado, DeleteObservation } from "./revision/types"
+import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita, aprobarCita } from "@/services/citaService"
+import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, anularObservacion, SECCION_IDS } from "@/services/observacionService"
 import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
 // Lazy-load de los Tabs
@@ -48,6 +48,7 @@ interface RevisionAtencionModalProps {
   citaContext: CitaContext
   onSave?: (observations: FieldObservation[]) => void
   onRefresh?: () => void
+  citaEstado?: string
 }
 
 export function RevisionAtencionModal({
@@ -56,7 +57,8 @@ export function RevisionAtencionModal({
   citaId,
   citaContext,
   onSave,
-  onRefresh
+  onRefresh,
+  citaEstado = '1' // Default to PENDIENTE if not provided
 }: RevisionAtencionModalProps) {
   const [observations, setObservations] = useState<FieldObservation[]>([])
   const [activeTab, setActiveTab] = useState<TabSection>("atencion")
@@ -107,9 +109,12 @@ export function RevisionAtencionModal({
       // Cargar observaciones existentes
       const observacionesExistentes = await obtenerObservacionesPorCita(citaId)
 
-      // Mapear y deduplicar observaciones del backend al formato del componente
+      // Mapear observaciones del backend al formato del componente
+      // Filtrar: estado 0 (anuladas) no se muestran, estado 1 (activas) y estado 2 (subsanadas) sí
       // Regla: solo una observación por sección (fieldName), tomando la de mayor idObservacion
-      const observacionesPorSeccion = observacionesExistentes.reduce((acc, obs) => {
+      const observacionesFiltradas = observacionesExistentes.filter(obs => obs.estado !== '0')
+      
+      const observacionesPorSeccion = observacionesFiltradas.reduce((acc, obs) => {
         // Buscar el nombre de sección por su ID
         const sectionEntry = Object.entries(SECCION_IDS).find(([_, id]) => id === obs.idSeccion)
         const sectionName = sectionEntry ? sectionEntry[0] : `OBSERVACION_seccion_${obs.idSeccion}`
@@ -123,7 +128,8 @@ export function RevisionAtencionModal({
             fieldName: sectionName,
             originalValue: "",
             observation: obs.descripcion,
-            idObservacion: obs.idObservacion
+            idObservacion: obs.idObservacion,
+            estado: obs.estado
           }
         }
 
@@ -322,6 +328,16 @@ export function RevisionAtencionModal({
   const getObservationText = (fieldName: string) =>
     observations.find(o => o.fieldName === fieldName)?.observation || ""
 
+  const getObservationEstado: GetObservationEstado = (fieldName: string) =>
+    observations.find(o => o.fieldName === fieldName)?.estado
+
+  const handleDeleteObservationByField: DeleteObservation = async (fieldName: string) => {
+    const obs = observations.find(o => o.fieldName === fieldName)
+    if (obs) {
+      await handleDeleteObservation(obs)
+    }
+  }
+
   const prettySectionLabel = (fieldName: string) => {
     const map: Record<string, string> = {
       OBSERVACION_informacion_clinica: "Observación de la Información Clínica",
@@ -368,6 +384,25 @@ export function RevisionAtencionModal({
     }
   }
 
+  // Función para aprobar la cita (cambiar a estado 3)
+  const handleApprove = async () => {
+    try {
+      // Cambiar el estado de la cita a APROBADO (3)
+      await aprobarCita(citaId)
+      
+      // Refrescar la lista si se proporciona el callback
+      if (onRefresh) {
+        onRefresh()
+      }
+      
+      onClose()
+      console.log(`✅ Cita ${citaId} aprobada correctamente`)
+    } catch (error) {
+      console.error("Error al aprobar cita:", error)
+      alert("Error al aprobar la cita. Por favor, intente nuevamente.")
+    }
+  }
+
   const getTipoDxBadge = (tipo: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       D: { label: "Definitivo", className: "bg-green-100 text-green-800 border-green-200" },
@@ -376,6 +411,27 @@ export function RevisionAtencionModal({
     }
     return badges[tipo] || { label: tipo, className: "bg-gray-100 text-gray-800 border-gray-200" }
   }
+
+  // Eliminar (anular) una observación
+  const handleDeleteObservation = async (obs: FieldObservation) => {
+    if (!obs.idObservacion) return
+    
+    try {
+      // Obtener el DNI del usuario desde el JWT
+      const usuario = extractDocumentFromToken() || "SISTEMA"
+      await anularObservacion(obs.idObservacion, usuario)
+      // Remover del estado local
+      setObservations(prev => prev.filter(o => o.idObservacion !== obs.idObservacion))
+      console.log(`✅ Observación ${obs.idObservacion} anulada correctamente`)
+    } catch (error) {
+      console.error("Error al anular observación:", error)
+      alert("Error al eliminar la observación. Por favor, intente nuevamente.")
+    }
+  }
+
+  // Filtrar observaciones activas (estado 1 o sin estado definido)
+  const observacionesActivas = observations.filter(obs => obs.estado !== '2')
+  const observacionesSubsanadas = observations.filter(obs => obs.estado === '2')
 
   // -------------------------------
   // Render principal
@@ -434,8 +490,24 @@ export function RevisionAtencionModal({
                   <ArrowLeft className="h-4 w-4" />
                   Volver
                 </Button>
-                <DialogTitle className="text-2xl font-semibold text-white">
+                <DialogTitle className="text-2xl font-semibold text-white flex items-center gap-3">
                   Revisión de Atención Médica
+                  {/* Etiqueta de estado de auditoría */}
+                  {citaEstado && (
+                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${
+                      citaEstado === 'APROBADO' ? 'bg-green-500/20 text-green-100 border border-green-400/50' :
+                      citaEstado === 'OBSERVADO' ? 'bg-red-500/20 text-red-100 border border-red-400/50' :
+                      citaEstado === 'SUBSANADO' ? 'bg-purple-500/20 text-purple-100 border border-purple-400/50' :
+                      citaEstado === 'EN_REVISION' ? 'bg-blue-500/20 text-blue-100 border border-blue-400/50' :
+                      'bg-yellow-500/20 text-yellow-100 border border-yellow-400/50'
+                    }`}>
+                      {citaEstado === 'APROBADO' ? 'Aprobado' :
+                       citaEstado === 'OBSERVADO' ? 'Observado' :
+                       citaEstado === 'SUBSANADO' ? 'Subsanado' :
+                       citaEstado === 'EN_REVISION' ? 'En Revisión' :
+                       'Pendiente'}
+                    </span>
+                  )}
                 </DialogTitle>
               </div>
               <Button
@@ -471,19 +543,19 @@ export function RevisionAtencionModal({
                 </TabsList>
 
                 <TabsContent value="atencion" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} />
+                  <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
                 </TabsContent>
 
                 <TabsContent value="diagnosticos" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} />
+                  <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
                 </TabsContent>
 
                 <TabsContent value="apoyo" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} />
+                  <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
                 </TabsContent>
 
                 <TabsContent value="farmacia" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
-                  <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} />
+                  <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
                 </TabsContent>
               </Tabs>
 
@@ -491,19 +563,35 @@ export function RevisionAtencionModal({
               <div className="border-t mt-4 pt-4 bg-gray-50 px-4 py-3 rounded-b-lg">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
-                    <span className="font-semibold">{observations.length}</span> observación(es) registradas
+                    <span className="font-semibold">{observacionesActivas.length}</span> observación(es) activa(s)
+                    {observacionesSubsanadas.length > 0 && (
+                      <span className="ml-2 text-red-600">| {observacionesSubsanadas.length} subsanada(s)</span>
+                    )}
                   </div>
                   <div className="flex gap-3">
                     <Button variant="outline" onClick={onClose} className="border-gray-300">
                       Cancelar
                     </Button>
+                    
+                    {/* Botón Aprobar - visible cuando no hay observaciones activas y la cita está en estado SUBSANADO o EN_REVISION */}
+                    {observacionesActivas.length === 0 && (citaEstado === 'SUBSANADO' || citaEstado === 'EN_REVISION') && (
+                      <Button
+                        onClick={handleApprove}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Aprobar
+                      </Button>
+                    )}
+                    
+                    {/* Botón Guardar Observaciones - siempre visible */}
                     <Button
                       onClick={handleSaveAll}
                       className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
-                      disabled={observations.length === 0}
+                      disabled={observacionesActivas.length === 0}
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Guardar Observaciones ({observations.length})
+                      Guardar Observaciones ({observacionesActivas.length})
                     </Button>
                   </div>
                 </div>
@@ -524,11 +612,13 @@ export function RevisionAtencionModal({
           </DialogHeader>
           <div className="flex-1 overflow-y-auto py-4">
             <p className="text-gray-700 mb-4">
-              Se han registrado <span className="font-bold text-[#4F9BB6]">{observations.length}</span> observación(es). 
+              Se han registrado <span className="font-bold text-[#4F9BB6]">{observacionesActivas.length}</span> observación(es) activa(s). 
               Por favor, revise el detalle antes de confirmar:
             </p>
+            
+            {/* Observaciones Activas */}
             <div className="space-y-3">
-              {observations.map((obs) => (
+              {observacionesActivas.map((obs) => (
                 <div key={obs.fieldName} className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
@@ -537,10 +627,44 @@ export function RevisionAtencionModal({
                         {obs.observation}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteObservation(obs)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                      title="Eliminar observación"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Observaciones Subsanadas (solo lectura, en rojo) */}
+            {observacionesSubsanadas.length > 0 && (
+              <div className="mt-6">
+                <p className="text-red-600 font-semibold mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Observaciones Subsanadas ({observacionesSubsanadas.length})
+                </p>
+                <div className="space-y-3">
+                  {observacionesSubsanadas.map((obs) => (
+                    <div key={obs.fieldName} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <p className="font-semibold text-red-800 mb-1">{prettySectionLabel(obs.fieldName)}</p>
+                          <p className="text-sm text-red-700 bg-white p-2 rounded border border-red-100">
+                            {obs.observation}
+                          </p>
+                          <p className="text-xs text-red-500 mt-1 italic">Subsanada - Solo lectura</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>

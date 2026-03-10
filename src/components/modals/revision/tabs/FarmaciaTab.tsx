@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Pill, CheckCircle, AlertCircle, XCircle } from "lucide-react"
 import { SectionObservation } from "../SharedComponents"
 import { Badge } from "@/components/ui/badge"
-import type { AtencionData, AddObservation, HasObservation } from "../types"
+import type { AtencionData, AddObservation, HasObservation, GetObservationEstado, DeleteObservation } from "../types"
 
 // Mapeo de vías de administración
 const VIAS_MAP: Record<string, string> = {
@@ -37,9 +37,11 @@ interface Props {
   onAddObservation: AddObservation
   hasObservation: HasObservation
   getObservationText: (fieldName: string) => string
+  getObservationEstado?: GetObservationEstado
+  onDeleteObservation?: DeleteObservation
 }
 
-export default function FarmaciaTab({ atencion, onAddObservation, hasObservation, getObservationText }: Props) {
+export default function FarmaciaTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
   return (
     <div className="space-y-4 pr-2">
       <Card className="shadow-sm border-l-4 border-l-purple-500">
@@ -128,6 +130,8 @@ export default function FarmaciaTab({ atencion, onAddObservation, hasObservation
               onAddObservation={onAddObservation}
               hasObservation={hasObservation('OBSERVACION_farmacia')}
               getObservationText={getObservationText}
+              estado={getObservationEstado?.('OBSERVACION_farmacia')}
+              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_farmacia') : undefined}
             />
           </div>
         </CardContent>

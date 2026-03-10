@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
-  const login = (token: string, primerInicio: boolean) => {
+  const login = (token: string, _primerInicio: boolean) => {
     setAuthToken(token);
     setIsAuthenticated(true);
     
