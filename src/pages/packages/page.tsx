@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react"
+﻿import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, RefreshCw, FilterX } from "lucide-react"
+import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react"
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import {
@@ -37,6 +37,41 @@ interface DetallePaquete {
   fechaCreacion: string
 }
 
+// Interfaces para verificación de reglas
+interface ObservacionRegla {
+  fua: string
+  errores: string[]
+}
+
+interface ProcesoVerificacion {
+  codigo: number
+  descripcion: string
+  estado: string
+}
+
+interface CargaVerificacion {
+  recepcionada: number
+  consolidada: number
+  produccion: number
+  observada: number
+  observadaDup: number
+  observadaRc: number
+  observadaCat: number
+}
+
+interface DataVerificacion {
+  estado: string
+  proceso: ProcesoVerificacion
+  carga: CargaVerificacion
+  observaciones: ObservacionRegla[]
+}
+
+interface VerificacionReglasResponse {
+  estado: string
+  data: DataVerificacion
+  mensaje?: string
+}
+
 export default function PackagesPage() {
   const [estado, setEstado] = useState<string>("todos")
   const [numeroPaquete, setNumeroPaquete] = useState<string>("")
@@ -50,6 +85,10 @@ export default function PackagesPage() {
   const [paginaDetalles, setPaginaDetalles] = useState(0)
   const [totalPaginasDetalles, setTotalPaginasDetalles] = useState(0)
   const [detalleSeleccionadoObservacion, setDetalleSeleccionadoObservacion] = useState<string | null>(null)
+  const [verificacionReglas, setVerificacionReglas] = useState<VerificacionReglasResponse | null>(null)
+  const [loadingVerificacion, setLoadingVerificacion] = useState(false)
+  const [mostrarVerificacion, setMostrarVerificacion] = useState(false)
+  const [errorVerificacion, setErrorVerificacion] = useState<string | null>(null)
   const tamanio = 10
 
   const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
@@ -89,6 +128,60 @@ export default function PackagesPage() {
     }
   }
 
+  // Verificar reglas del paquete
+  const verificarReglasPaquete = async (codigoPaquete: string) => {
+    try {
+      setLoadingVerificacion(true)
+      setErrorVerificacion(null)
+      setVerificacionReglas(null)
+      
+      const response = await fetch(`${API_INTEROP_URL}/conecta-sis/consulta/${codigoPaquete}`)
+      const result: VerificacionReglasResponse = await response.json()
+      
+      if (result.estado === "OK") {
+        setVerificacionReglas(result)
+        setMostrarVerificacion(true)
+      } else {
+        setErrorVerificacion(result.mensaje || "Error al verificar las reglas del paquete")
+      }
+    } catch (err) {
+      console.error("Error verificando reglas:", err)
+      setErrorVerificacion("Error de conexión al verificar las reglas")
+    } finally {
+      setLoadingVerificacion(false)
+    }
+  }
+
+  // Helper para obtener el color del estado del paquete
+  const getEstadoPaqueteColor = (estado: string) => {
+    switch (estado) {
+      case "Finalizado":
+        return "bg-green-100 text-green-800 border-green-300"
+      case "Procesando":
+        return "bg-blue-100 text-blue-800 border-blue-300"
+      case "Error":
+        return "bg-red-100 text-red-800 border-red-300"
+      case "No encontrado":
+        return "bg-gray-100 text-gray-800 border-gray-300"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300"
+    }
+  }
+
+  // Helper para obtener el icono del estado
+  const getEstadoIcon = (estado: string) => {
+    switch (estado) {
+      case "Finalizado":
+        return <CheckCircle2 className="w-5 h-5 text-green-600" />
+      case "Procesando":
+        return <Clock className="w-5 h-5 text-blue-600" />
+      case "Error":
+        return <XCircle className="w-5 h-5 text-red-600" />
+      default:
+        return <AlertTriangle className="w-5 h-5 text-gray-600" />
+    }
+  }
+
   // Load paquetes on mount and when filters change
   useEffect(() => {
     fetchPaquetes()
@@ -97,6 +190,9 @@ export default function PackagesPage() {
   const handlePaqueteClick = (paquete: Paquete) => {
     setPaqueteSeleccionado(paquete)
     setPaginaDetalles(0)
+    setVerificacionReglas(null)
+    setMostrarVerificacion(false)
+    setErrorVerificacion(null)
     fetchDetallesPaquete(paquete.idPaqueteSis)
   }
 
@@ -136,7 +232,7 @@ export default function PackagesPage() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-[#9CD2D3]/30 p-8">
-        {/* Header con título y botones */}
+        {/* Header con tÃ­tulo y botones */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-[#9CD2D3]/20">
           <h1 className="text-2xl font-semibold text-[#114C5F]">Control de Paquetes</h1>
           <div className="flex gap-3">
@@ -161,14 +257,14 @@ export default function PackagesPage() {
             />
 
             <div className="space-y-2">
-              <Label htmlFor="numeroPaquete">N° Paquete:</Label>
+              <Label htmlFor="numeroPaquete">NÂ° Paquete:</Label>
               <div className="relative">
                 <Input
                   id="numeroPaquete"
                   type="text"
                   value={numeroPaquete}
                   onChange={(e) => setNumeroPaquete(e.target.value)}
-                  placeholder="Ingrese número de paquete"
+                  placeholder="Ingrese nÃºmero de paquete"
                 />
                 {numeroPaquete && (
                   <button
@@ -197,7 +293,7 @@ export default function PackagesPage() {
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Paquete</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">NÂ° Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado del Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Inicio</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Fin</th>
@@ -249,7 +345,7 @@ export default function PackagesPage() {
                     </tbody>
                   </table>
                 </div>
-                {/* Paginación de paquetes */}
+                {/* PaginaciÃ³n de paquetes */}
                 {totalPaginas > 1 && (
                   <div className="flex justify-center py-4 border-t">
                     <Pagination>
@@ -288,16 +384,34 @@ export default function PackagesPage() {
             <div className="lg:col-span-5">
               {paqueteSeleccionado ? (
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-100 px-4 py-3 border-b">
+                  <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-700">
                       Detalles del Paquete: {paqueteSeleccionado.codigoPaqueteSis}
                     </h3>
+                    <Button
+                      size="sm"
+                      onClick={() => verificarReglasPaquete(paqueteSeleccionado.codigoPaqueteSis)}
+                      disabled={loadingVerificacion}
+                      className="bg-[#114C5F] hover:bg-[#0d3a4a] text-white text-xs h-7"
+                    >
+                      {loadingVerificacion ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Verificando...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3 h-3 mr-1" />
+                          Verificar Reglas
+                        </>
+                      )}
+                    </Button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">N° FUA</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">NÂ° FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Estado del FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observaciones</th>
                         </tr>
@@ -354,7 +468,7 @@ export default function PackagesPage() {
                       </tbody>
                     </table>
                   </div>
-                  {/* Paginación de detalles */}
+                  {/* PaginaciÃ³n de detalles */}
                   {totalPaginasDetalles > 1 && (
                     <div className="flex justify-center py-3 border-t">
                       <Pagination>
@@ -419,6 +533,142 @@ export default function PackagesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de verificación de reglas */}
+      <Dialog
+        open={mostrarVerificacion}
+        onOpenChange={(open) => !open && setMostrarVerificacion(false)}
+      >
+        <DialogContent className="bg-white sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#114C5F]" />
+              Verificación de Reglas - {paqueteSeleccionado?.codigoPaqueteSis}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {verificacionReglas && (
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* Estado general del paquete */}
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50">
+                {getEstadoIcon(verificacionReglas.data.estado)}
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Estado del Paquete</p>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold border ${getEstadoPaqueteColor(verificacionReglas.data.estado)}`}>
+                    {verificacionReglas.data.estado}
+                  </span>
+                </div>
+              </div>
+
+              {/* Proceso actual */}
+              <div className="p-3 rounded-lg border bg-gray-50">
+                <p className="text-sm font-medium text-gray-700 mb-2">Proceso Actual</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-[#114C5F] text-white px-2 py-1 rounded">
+                    Código {verificacionReglas.data.proceso.codigo}
+                  </span>
+                  <span className="text-sm text-gray-600">{verificacionReglas.data.proceso.descripcion}</span>
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    verificacionReglas.data.proceso.estado === "Completado" 
+                      ? "bg-green-100 text-green-800" 
+                      : "bg-yellow-100 text-yellow-800"
+                  }`}>
+                    {verificacionReglas.data.proceso.estado}
+                  </span>
+                </div>
+              </div>
+
+              {/* Resumen de carga */}
+              <div className="p-3 rounded-lg border bg-gray-50">
+                <p className="text-sm font-medium text-gray-700 mb-2">Resumen de Carga</p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-lg font-bold text-blue-600">{verificacionReglas.data.carga.recepcionada}</p>
+                    <p className="text-[10px] text-gray-500">Recepcionadas</p>
+                  </div>
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-lg font-bold text-green-600">{verificacionReglas.data.carga.consolidada}</p>
+                    <p className="text-[10px] text-gray-500">Consolidadas</p>
+                  </div>
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-lg font-bold text-purple-600">{verificacionReglas.data.carga.produccion}</p>
+                    <p className="text-[10px] text-gray-500">Producción</p>
+                  </div>
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-lg font-bold text-red-600">{verificacionReglas.data.carga.observada}</p>
+                    <p className="text-[10px] text-gray-500">Observadas</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center mt-2">
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-sm font-bold text-orange-600">{verificacionReglas.data.carga.observadaDup}</p>
+                    <p className="text-[10px] text-gray-500">Obs. Duplicadas</p>
+                  </div>
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-sm font-bold text-amber-600">{verificacionReglas.data.carga.observadaRc}</p>
+                    <p className="text-[10px] text-gray-500">Obs. RC</p>
+                  </div>
+                  <div className="p-2 bg-white rounded border">
+                    <p className="text-sm font-bold text-rose-600">{verificacionReglas.data.carga.observadaCat}</p>
+                    <p className="text-[10px] text-gray-500">Obs. Catálogo</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de observaciones */}
+              {verificacionReglas.data.observaciones.length > 0 && (
+                <div className="p-3 rounded-lg border bg-red-50">
+                  <p className="text-sm font-medium text-red-700 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Observaciones ({verificacionReglas.data.observaciones.length} FUAs con errores)
+                  </p>
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {verificacionReglas.data.observaciones.map((obs, index) => (
+                      <div key={index} className="p-2 bg-white rounded border border-red-200">
+                        <p className="text-xs font-semibold text-gray-700 mb-1">FUA: {obs.fua}</p>
+                        <ul className="list-disc list-inside">
+                          {obs.errores.map((error, errIndex) => (
+                            <li key={errIndex} className="text-xs text-red-600">{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {verificacionReglas.data.observaciones.length === 0 && (
+                <div className="p-4 rounded-lg border bg-green-50 text-center">
+                  <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-green-700">Sin observaciones</p>
+                  <p className="text-xs text-green-600">El paquete no presenta errores de validación</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {errorVerificacion && (
+            <div className="p-4 rounded-lg border bg-red-50 text-center">
+              <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+              <p className="text-sm font-medium text-red-700">{errorVerificacion}</p>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end pt-3 border-t">
+            <Button
+              onClick={() => setMostrarVerificacion(false)}
+              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white px-4 py-1 text-sm"
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
+
+
+
+
