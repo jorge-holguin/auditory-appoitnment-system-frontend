@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Trash2, Loader2, AlertCircle, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Trash2, Loader2, AlertCircle, AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
 import { obtenerCuentaPorCita, obtenerDetalleLiquidacion, eliminarItemLiquidacion, type DetalleLiquidacion } from "@/services/citaService"
 
 interface LiquidacionesModalProps {
@@ -31,6 +31,9 @@ export function LiquidacionesModal({
   const [cuentaId, setCuentaId] = useState<number | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<ItemAgrupado | null>(null)
+  const [showResultDialog, setShowResultDialog] = useState(false)
+  const [resultSuccess, setResultSuccess] = useState(true)
+  const [resultMessage, setResultMessage] = useState("")
   const [deleting, setDeleting] = useState(false)
 
   // Cargar datos cuando se abre el modal
@@ -105,21 +108,23 @@ export function LiquidacionesModal({
         )
       )
       
-      // Cerrar diálogo
-      setShowConfirmDialog(false)
-      setItemToDelete(null)
+      setResultSuccess(true)
+      setResultMessage("El item fue eliminado correctamente.")
+      setShowResultDialog(true)
     } catch (err) {
       console.error("Error al eliminar item:", err)
-      alert("Error al eliminar el item. Por favor, intente nuevamente.")
+      setResultSuccess(false)
+      setResultMessage("Error al eliminar el item. Por favor, intente nuevamente.")
+      setShowResultDialog(true)
     } finally {
       setDeleting(false)
     }
   }
 
-  // Calcular total general
+  // Calcular total general (solo items activos estado=1 y no removidos)
   const calcularTotalGeneral = (): number => {
     return items
-      .filter(item => !item.removido)
+      .filter(item => !item.removido && item.estado === "1")
       .reduce((sum, item) => sum + item.total, 0)
   }
 
@@ -310,6 +315,43 @@ export function LiquidacionesModal({
                   Eliminar
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de resultado de eliminación */}
+      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+        <DialogContent className="max-w-md bg-white border border-gray-300 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${resultSuccess ? 'text-green-600' : 'text-red-600'}`}>
+              {resultSuccess ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Éxito
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5" />
+                  Error
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-gray-700 text-center">
+              {resultMessage}
+            </p>
+          </div>
+
+          <DialogFooter className="flex justify-center">
+            <Button
+              type="button"
+              onClick={() => setShowResultDialog(false)}
+              className={`${resultSuccess ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} text-white`}
+            >
+              Aceptar
             </Button>
           </DialogFooter>
         </DialogContent>
