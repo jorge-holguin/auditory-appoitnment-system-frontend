@@ -9,7 +9,8 @@ import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
 import { useCatalogos } from "@/contexts/CatalogosContext"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Sun, Moon } from "lucide-react"
+import { RefreshCw, FilterX, Eye, RotateCcw, Loader2 } from "lucide-react"
+import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
@@ -236,6 +237,7 @@ export default function AuditPage() {
       "APROBADO": "bg-green-100 text-green-800 border border-green-300",
       "OBSERVADO": "bg-red-100 text-red-800 border border-red-300",
       "SUBSANADO": "bg-purple-100 text-purple-800 border border-purple-300",
+      "COMPLETADO": "bg-teal-100 text-teal-800 border border-teal-300",
     }
     return badges[estado as keyof typeof badges] || "bg-gray-100 text-gray-800 border border-gray-300"
   }
@@ -247,6 +249,7 @@ export default function AuditPage() {
       "APROBADO": "Aprobado",
       "OBSERVADO": "Observado",
       "SUBSANADO": "Subsanado",
+      "COMPLETADO": "Completado",
     }
     return labels[estado as keyof typeof labels] || estado
   }
@@ -348,46 +351,7 @@ export default function AuditPage() {
 
        {/* Fila 2 - Columna 1: Turno */}
           <div>
-            <label className="block text-sm font-medium text-[#114C5F] mb-2 flex items-center gap-2">
-              Turno
-            </label>
-            <div className="inline-flex items-center gap-2 whitespace-nowrap text-sm border border-[#9CD2D3] hover:border-[#4F9BB6] bg-background hover:bg-white focus:ring-2 focus:ring-[#4F9BB6] transition-all rounded-md text-[#114C5F] w-fit px-2 py-1">
-              <button
-                type="button"
-                onClick={() => setTurno("M")}
-                className={`inline-flex items-center gap-2 px-3 h-[34px] rounded-md text-sm font-medium transition-all ${
-                  turno === "M"
-                    ? "bg-gradient-to-r from-orange-400 to-yellow-400 text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Sun className="w-4 h-4" />
-                Mañana
-              </button>
-              <button
-                type="button"
-                onClick={() => setTurno("T")}
-                className={`inline-flex items-center gap-2 px-3 h-[34px] rounded-md text-sm font-medium transition-all ${
-                  turno === "T"
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Moon className="w-4 h-4" />
-                Tarde
-              </button>
-              <button
-                type="button"
-                onClick={() => setTurno("TODOS")}
-                className={`inline-flex items-center gap-2 px-3 h-[34px] rounded-md text-sm font-medium transition-all ${
-                  turno === "TODOS"
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                Todos
-              </button>
-            </div>
+            <TurnoSelector value={turno} onChange={setTurno} />
           </div>
 
             {/* Fila 2 - Columna 2: Especialidad */}

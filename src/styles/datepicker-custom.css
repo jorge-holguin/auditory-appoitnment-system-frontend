@@ -36,10 +36,22 @@
 }
 
 /* Días de la semana */
+.react-datepicker__day-names {
+  background-color: #4F9BB6 !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  padding: 0.5rem 0 !important;
+  margin: 0 !important;
+}
+
 .react-datepicker__day-name {
   color: white !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   font-size: 0.85rem !important;
+  width: 2rem !important;
+  line-height: 2rem !important;
+  text-align: center !important;
+  margin: 0 !important;
 }
 
 /* Días */

@@ -347,8 +347,8 @@ export default function PackagesPage() {
                 </div>
                 {/* PaginaciÃ³n de paquetes */}
                 {totalPaginas > 1 && (
-                  <div className="flex justify-center py-4 border-t">
-                    <Pagination>
+                  <div className="flex justify-center py-4 border-t overflow-x-auto">
+                    <Pagination className="flex-wrap">
                       <PaginationContent>
                         <PaginationItem>
                           <PaginationPrevious 
@@ -667,6 +667,7 @@ export default function PackagesPage() {
     </div>
   )
 }
+
 
 
 

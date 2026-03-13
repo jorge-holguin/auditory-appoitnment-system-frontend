@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react"
+﻿import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle } from "lucide-react"
 
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoFuaSelector } from "@/components/selectors/EstadoFuaSelector"
+import { TurnoSelector } from "@/components/selectors/TurnoSelector"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePickerAria } from "@/components/ui/DateRangePickerAria"
 import {
   Pagination,
@@ -32,6 +34,10 @@ export default function PlotPage() {
   const [origen, setOrigen] = useState<string>("CE")
   const [especialidad, setEspecialidad] = useState<string>("todos")
   const [estado, setEstado] = useState<string>("2")
+  const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
+  
+  // Estado para selección de FUAs
+  const [selectedFuas, setSelectedFuas] = useState<Set<string>>(new Set())
   
   // Inicializar con la fecha de hoy
   const today = new Date()
@@ -154,16 +160,23 @@ export default function PlotPage() {
       return
     }
 
-    // Usar todos los FUAs cargados
-    const idsAtencion = fuas.map(fua => fua.id)
+    // Usar FUAs seleccionados o todos si no hay selección
+    const idsAtencion = selectedFuas.size > 0 
+      ? Array.from(selectedFuas) 
+      : fuas.map(fua => fua.id)
 
     if (idsAtencion.length === 0) {
-      alert("No hay FUAs para generar el paquete")
+      alert("No hay FUAs para generar el paquete. Por favor seleccione al menos una atención.")
       return
     }
 
-    if (idsAtencion.length < 5) {
-      alert("Debe haber al menos 5 atenciones para generar el paquete")
+    if (idsAtencion.length < 10) {
+      alert(`Debe seleccionar al menos 10 atenciones para generar el paquete. Actualmente tiene ${idsAtencion.length} seleccionadas.`)
+      return
+    }
+
+    if (idsAtencion.length > 25) {
+      alert(`Puede seleccionar máximo 25 atenciones por paquete. Actualmente tiene ${idsAtencion.length} seleccionadas.`)
       return
     }
 
@@ -299,45 +312,48 @@ export default function PlotPage() {
         <div>
           {/* Filtros responsive */}
           <div className="space-y-4 mb-6">
-            {/* Desktop: Una fila con todos los filtros */}
-            <div className="hidden lg:grid lg:grid-cols-12 gap-3 items-end">
-              <div className="col-span-2">
+            {/* Desktop: Dos filas con 3 columnas cada una */}
+            <div className="hidden lg:flex lg:flex-col gap-3">
+              {/* Fila 1: Fecha - Origen - Turno */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <div className="relative">
+                    <DateRangePickerAria
+                      value={dateRange}
+                      onChange={setDateRange}
+                      label="Fecha"
+                    />
+                    <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                
                 <OrigenSelector
                   value={origen}
                   onChange={setOrigen}
                   label="Origen"
                 />
+                
+                <TurnoSelector
+                  value={turno}
+                  onChange={setTurno}
+                />
               </div>
               
-              <div className="col-span-3">
+              {/* Fila 2: Especialidad - Estado - Botón Generar */}
+              <div className="grid grid-cols-3 gap-3 items-end">
                 <EspecialidadSimpleSelector
                   value={especialidad}
                   onChange={setEspecialidad}
                   label="Especialidad"
                   defaultOpen={true}
                 />
-              </div>
-              
-              <div className="col-span-2">
+                
                 <EstadoFuaSelector
                   value={estado}
                   onChange={setEstado}
                   label="Estado"
                 />
-              </div>
-              
-              <div className="col-span-3">
-                <div className="relative">
-                  <DateRangePickerAria
-                    value={dateRange}
-                    onChange={setDateRange}
-                    label="Fecha"
-                  />
-                  <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              
-              <div className="col-span-2">
+                
                 <Button 
                   onClick={handleGenerarPaquete}
                   disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
@@ -487,6 +503,21 @@ export default function PlotPage() {
               <table className="w-full">
                 <thead className="bg-gray-100 border-b">
                   <tr>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-12">
+                      <Checkbox
+                        checked={pageFuas.length > 0 && pageFuas.every(f => selectedFuas.has(f.id))}
+                        onCheckedChange={(checked) => {
+                          const pageIds = new Set(pageFuas.map(f => f.id))
+                          if (checked) {
+                            setSelectedFuas(new Set([...selectedFuas, ...pageIds]))
+                          } else {
+                            const newSelected = new Set(selectedFuas)
+                            pageIds.forEach(id => newSelected.delete(id))
+                            setSelectedFuas(newSelected)
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Cuenta</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
@@ -517,7 +548,24 @@ export default function PlotPage() {
                         key={fua.id}
                         className="border-b hover:bg-gray-50"
                       >
-                        <td className="px-4 py-3 text-sm">{(fua as any).idCuenta || fua.id}</td>
+                        <td className="px-4 py-3 text-center">
+                        <Checkbox
+                          key={`chk-${fua.id}`}
+                          checked={selectedFuas.has(fua.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedFuas(prev => {
+                              const newSelected = new Set(prev)
+                              if (checked) {
+                                newSelected.add(fua.id)
+                              } else {
+                                newSelected.delete(fua.id)
+                              }
+                              return newSelected
+                            })
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-sm">{(fua as any).idCuenta || fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).tipoAtencion?.trim() || 'N/A'}</td>
@@ -547,10 +595,21 @@ export default function PlotPage() {
 
           {/* Información, selección y paginación */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
               <span>
                 Mostrando {fuas.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, fuas.length)} de {fuas.length} registros
               </span>
+              {selectedFuas.size > 0 && (
+                <span className="text-sm font-medium text-[#4F9BB6]">
+                  ({selectedFuas.size} seleccionados)
+                  <button
+                    onClick={() => setSelectedFuas(new Set())}
+                    className="ml-2 text-xs text-red-500 hover:text-red-700 underline"
+                  >
+                    Limpiar
+                  </button>
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
@@ -772,3 +831,9 @@ export default function PlotPage() {
     </div>
   )
 }
+
+
+
+
+
+

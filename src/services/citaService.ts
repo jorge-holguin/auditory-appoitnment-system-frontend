@@ -17,6 +17,8 @@ function getEstadoNumero(estadoAuditoria: string): number {
       return 4
     case "SUBSANADO":
       return 5
+    case "COMPLETADO":
+      return 6
     default:
       return 1
   }
@@ -42,6 +44,8 @@ export function getEstadoString(estadoAuditoria: number | string | null | undefi
       return "OBSERVADO"
     case 5:
       return "SUBSANADO"
+    case 6:
+      return "COMPLETADO"
     default:
       return "PENDIENTE"
   }

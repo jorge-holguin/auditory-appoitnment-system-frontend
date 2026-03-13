@@ -66,6 +66,7 @@ export function LiquidacionesModal({
 
     items.forEach(item => {
       if (item.removido) return // Ignorar items removidos
+      if (item.estado !== "1") return // Solo mostrar items activos (estado=1), estado=0 está anulado
 
       const clasificador = item.clasificadorNombre?.trim() || 'Sin clasificador'
       if (!grupos[clasificador]) {
@@ -195,6 +196,7 @@ export function LiquidacionesModal({
                         <tr className="bg-gray-50 border-b">
                           <th className="text-left p-3 font-semibold text-gray-700">Item</th>
                           <th className="text-left p-3 font-semibold text-gray-700">Detalle del Producto</th>
+                          <th className="text-center p-3 font-semibold text-gray-700">CPMS</th>
                           <th className="text-center p-3 font-semibold text-gray-700">Cantidad</th>
                           <th className="text-right p-3 font-semibold text-gray-700">Precio</th>
                           <th className="text-right p-3 font-semibold text-gray-700">Total</th>
@@ -206,6 +208,7 @@ export function LiquidacionesModal({
                           <tr key={itemIndex} className="border-b hover:bg-gray-50 transition">
                             <td className="p-3 text-gray-800">{item.item?.trim() || ''}</td>
                             <td className="p-3 text-gray-800">{item.itemNombre}</td>
+                            <td className="p-3 text-center text-gray-800">{item.cpms || '-'}</td>
                             <td className="p-3 text-center text-gray-800">{item.cantidad}</td>
                             <td className="p-3 text-right text-gray-800">S/. {item.precio.toFixed(2)}</td>
                             <td className="p-3 text-right font-semibold text-gray-900">S/. {item.total.toFixed(2)}</td>
