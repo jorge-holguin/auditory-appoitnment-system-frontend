@@ -1,15 +1,9 @@
-FROM node:20-alpine AS builder
+﻿FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-<<<<<<< HEAD
-COPY package.json ./
-COPY .env ./
-RUN npm install
-=======
 COPY package.json package-lock.json ./
 RUN npm ci
->>>>>>> 117024d7a5a16c311d4dc47ba3e0aa870af7009f
 
 COPY . .
 
@@ -31,3 +25,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
+
