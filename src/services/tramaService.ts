@@ -151,7 +151,7 @@ export interface RespuestaSis {
  * Envía un paquete ZIP al SIS usando FormData
  */
 export async function enviarPaqueteAlSis(blob: Blob, nombreArchivo: string): Promise<RespuestaSis> {
-  const url = 'http://192.168.0.252:9004/interoperabilidadsis/api/v1/conecta-sis/cargar-zip'
+  const url = `${API_INTEROP_URL}/conecta-sis/cargar-zip`
 
   try {
     // Crear FormData y agregar el archivo como binario
@@ -224,7 +224,7 @@ export async function enviarPaqueteAlSis(blob: Blob, nombreArchivo: string): Pro
  * Actualiza el estado de un paquete en el SIS
  */
 export async function actualizarEstadoPaqueteSis(idPaquete: string, nuevoEstado: string = 'ENVIADO'): Promise<void> {
-  const url = `http://192.168.0.252:9004/interoperabilidadsis/api/v1/paquete-sis/estado/${idPaquete}?nuevoEstado=${nuevoEstado}`
+  const url = `${API_INTEROP_URL}/paquete-sis/estado/${idPaquete}?nuevoEstado=${nuevoEstado}`
 
   try {
     const response = await fetch(url, {
