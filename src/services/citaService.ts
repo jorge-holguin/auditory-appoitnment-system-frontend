@@ -329,20 +329,25 @@ export async function subsanarCita(citaId: string): Promise<any> {
 }
 
 /**
- * Obtiene las especialidades disponibles en un rango de fechas
+ * Interface para especialidad por solicitud
  */
-export async function obtenerEspecialidadesPorFecha(fechaInicio: Date, fechaFin: Date): Promise<Especialidad[]> {
-  // Formatear fechas como YYYY-MM-DD
-  const fechaInicioStr = format(fechaInicio, "yyyy-MM-dd")
-  const fechaFinStr = format(fechaFin, "yyyy-MM-dd")
+export interface EspecialidadSolicitud {
+  idEspecialidad: string
+  nombre: string
+}
 
-  const url = `${API_CITAS_URL}/cita/especialidades?fechaInicio=${fechaInicioStr}&fechaFin=${fechaFinStr}`
+/**
+ * Obtiene las especialidades disponibles para un rango de fechas
+ * GET /api/cita/especialidades-solicitud?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD
+ */
+export async function obtenerEspecialidadesPorFecha(fechaInicio: string, fechaFin: string): Promise<EspecialidadSolicitud[]> {
+  const url = `${API_CITAS_URL}/cita/especialidades-solicitud?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
 
   try {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "accept": "application/json"
+        "accept": "*/*"
       }
     })
 
@@ -351,7 +356,7 @@ export async function obtenerEspecialidadesPorFecha(fechaInicio: Date, fechaFin:
     }
 
     const data = await response.json()
-    return data
+    return Array.isArray(data) ? data : []
   } catch (error) {
     console.error("Error en obtenerEspecialidadesPorFecha:", error)
     throw error
@@ -511,3 +516,4 @@ export async function eliminarItemLiquidacion(cuentaId: number, item: string, or
     throw error
   }
 }
+

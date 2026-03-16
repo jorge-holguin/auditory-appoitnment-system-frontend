@@ -39,6 +39,7 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
   // Estados derivados para control de botones
   const isAprobado = estadoAuditoria === "APROBADO"
   const isObservado = estadoAuditoria === "OBSERVADO"
+  const isCompletado = estadoAuditoria === "COMPLETADO"
 
   const handleAprobar = async () => {
     setLoading(true)
@@ -126,8 +127,8 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
         <div className="flex gap-4 pt-4 border-t">
           <Button
             onClick={handleObservar}
-            // En APROBADO no debe permitir observar; en OBSERVADO sí
-            disabled={loading || isAprobado}
+            // En APROBADO o COMPLETADO no debe permitir observar; en OBSERVADO sí
+            disabled={loading || isAprobado || isCompletado}
             variant="outline"
             className="flex-1 h-12 text-base font-medium border-2 border-orange-500 text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -141,8 +142,8 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
           
           <Button
             onClick={handleAprobar}
-            // Deshabilitar Aprobar si ya está Observado o Aprobado
-            disabled={loading || isAprobado || isObservado}
+            // Deshabilitar Aprobar si ya está Observado, Aprobado o Completado
+            disabled={loading || isAprobado || isObservado || isCompletado}
             className="flex-1 h-12 text-base font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

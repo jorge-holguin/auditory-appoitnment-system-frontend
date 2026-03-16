@@ -257,14 +257,14 @@ export default function PackagesPage() {
             />
 
             <div className="space-y-2">
-              <Label htmlFor="numeroPaquete">NÂ° Paquete:</Label>
+              <Label htmlFor="numeroPaquete">N° Paquete:</Label>
               <div className="relative">
                 <Input
                   id="numeroPaquete"
                   type="text"
                   value={numeroPaquete}
                   onChange={(e) => setNumeroPaquete(e.target.value)}
-                  placeholder="Ingrese nÃºmero de paquete"
+                  placeholder="Ingrese numero de paquete"
                 />
                 {numeroPaquete && (
                   <button
@@ -293,7 +293,7 @@ export default function PackagesPage() {
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">NÂ° Paquete</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado del Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Inicio</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Fin</th>
@@ -411,7 +411,7 @@ export default function PackagesPage() {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">NÂ° FUA</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">N° FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Estado del FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observaciones</th>
                         </tr>

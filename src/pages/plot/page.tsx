@@ -109,7 +109,7 @@ export default function PlotPage() {
       cargarFuas()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origen, especialidad, estado, dateRange])
+  }, [origen, especialidad, estado, turno, dateRange])
 
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
@@ -135,7 +135,8 @@ export default function PlotPage() {
         fechaFinal,
         idOrigen: origen !== "todos" ? origen : "CE",
         idEstado: estado !== "todos" ? parseInt(estado) : 2,
-        idEspecialidad: especialidad !== "todos" ? especialidad : undefined
+        idEspecialidad: especialidad !== "todos" ? especialidad : undefined,
+        turnoConsulta: turno !== "TODOS" ? turno : undefined
       }
 
       const data = await listarFuas(params)
@@ -346,6 +347,8 @@ export default function PlotPage() {
                   onChange={setEspecialidad}
                   label="Especialidad"
                   defaultOpen={true}
+                  fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
+                  fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
                 />
                 
                 <EstadoFuaSelector
@@ -386,6 +389,8 @@ export default function PlotPage() {
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
+                fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
+                fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
               />
               
               <EstadoFuaSelector
@@ -433,6 +438,8 @@ export default function PlotPage() {
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
+                fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
+                fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
               />
               
               <EstadoFuaSelector
@@ -584,7 +591,7 @@ export default function PlotPage() {
                             {fua.estado === "2" ? "Pendiente" : fua.estado === "3" ? "Validado" : fua.estado === "4" ? "Cerrado" : fua.estado}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm">{(fua as any).especialidad || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{fua.nombreEspecialidad || fua.especialidad || 'N/A'}</td>
                       </tr>
                     ))
                   )}

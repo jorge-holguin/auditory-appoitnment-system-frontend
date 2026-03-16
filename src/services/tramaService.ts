@@ -2,11 +2,14 @@ const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
 
 export interface Fua {
   id: string
+  idCuenta?: string
   numeroFua: string
   paciente: string
   hc: string
   tipoAtencion: string
   especialidad: string
+  idEspecialidadSgh?: string
+  nombreEspecialidad?: string
   estado: string
   fechaAtencion: string
 }
@@ -17,6 +20,7 @@ export interface ListarFuasParams {
   idOrigen: string
   idEstado: number
   idEspecialidad?: string
+  turnoConsulta?: string // M = Mañana, T = Tarde
 }
 
 export interface DescargarZipRequest {
@@ -42,6 +46,11 @@ export async function listarFuas(params: ListarFuasParams): Promise<Fua[]> {
   // Agregar especialidad solo si está definida y no es "todos"
   if (params.idEspecialidad && params.idEspecialidad !== "todos") {
     queryParams.append("idEspecialidad", params.idEspecialidad)
+  }
+
+  // Agregar turno solo si está definido y no es "TODOS"
+  if (params.turnoConsulta && params.turnoConsulta !== "TODOS") {
+    queryParams.append("turnoConsulta", params.turnoConsulta)
   }
 
   const url = `${API_INTEROP_URL}/fua/listarFuas?${queryParams.toString()}`
