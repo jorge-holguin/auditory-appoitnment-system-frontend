@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { RevisionAtencionModal } from "./RevisionAtencionModal"
 import { aprobarCita } from "@/services/citaService"
 
@@ -36,10 +36,50 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
   const [loading, setLoading] = useState(false)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [loadingPdf, setLoadingPdf] = useState(false)
   
-  // Si está firmado, usar el endpoint de documento firmado, sino usar el endpoint por defecto
-  const pdfUrl = firmado 
+  // URL base para abrir en nueva pestaña (siempre usa la URL directa)
+  const externalPdfUrl = firmado 
     ? `${API_CONSULTA_EXTERNA_URL}/Fua056/getDocumentoFirmado?idDocumento=${citaId}&idTipoDocumento=10`
+    : `${API_CITAS_URL}/reporte/fua?citaId=${citaId}`
+  
+  // Efecto para cargar el PDF como blob cuando se abre el modal y está firmado
+  useEffect(() => {
+    if (open && firmado) {
+      setLoadingPdf(true)
+      fetch(`${API_CONSULTA_EXTERNA_URL}/Fua056/getDocumentoFirmado?idDocumento=${citaId}&idTipoDocumento=10`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Error al cargar PDF: ${response.status}`)
+          }
+          return response.blob()
+        })
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        })
+        .catch(err => {
+          console.error("Error cargando PDF firmado:", err)
+          setError("No se pudo cargar el PDF firmado")
+        })
+        .finally(() => {
+          setLoadingPdf(false)
+        })
+    }
+    
+    // Cleanup: revocar la URL del blob cuando se cierra
+    return () => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl)
+        setPdfBlobUrl(null)
+      }
+    }
+  }, [open, firmado, citaId])
+  
+  // URL para el iframe: si está firmado y tenemos el blob, usar el blob URL
+  const iframePdfUrl = firmado && pdfBlobUrl 
+    ? pdfBlobUrl 
     : `${API_CITAS_URL}/reporte/fua?citaId=${citaId}`
   
   // Estados derivados para control de botones
@@ -90,7 +130,7 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
   }
 
   const handleOpenInNewTab = () => {
-    window.open(pdfUrl, '_blank')
+    window.open(externalPdfUrl, '_blank')
   }
 
   return (
@@ -114,9 +154,15 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden rounded-lg border border-gray-200">
+        <div className="flex-1 overflow-hidden rounded-lg border border-gray-200 relative">
+          {loadingPdf && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
+              <Loader2 className="w-8 h-8 animate-spin text-[#4F9BB6] mb-2" />
+              <p className="text-gray-500">Cargando PDF firmado...</p>
+            </div>
+          )}
           <iframe
-            src={`${pdfUrl}#zoom=125`}
+            src={`${iframePdfUrl}#zoom=125`}
             className="w-full h-full"
             title={`FUA ${citaId}`}
             allow="fullscreen"

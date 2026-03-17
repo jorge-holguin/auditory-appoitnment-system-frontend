@@ -131,7 +131,7 @@ export default function AuditPage() {
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
         estadoAuditoria: estado !== "todos" ? estado : undefined,
         page,
-        size: pagination.size
+        size: 20 // Siempre usar tamaño de página por defecto
       })
 
       setAtenciones(response.content || [])
