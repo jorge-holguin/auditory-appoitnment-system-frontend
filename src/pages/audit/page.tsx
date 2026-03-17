@@ -14,7 +14,6 @@ import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
-import { format } from "date-fns"
 import "react-datepicker/dist/react-datepicker.css"
 import "@/styles/datepicker-custom.css"
 import { es } from 'date-fns/locale'
@@ -361,8 +360,6 @@ export default function AuditPage() {
                 value={especialidad} 
                 onChange={setEspecialidad}
                 label="Especialidad"
-                fechaInicio={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
-                fechaFin={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
               />
             </div>
 

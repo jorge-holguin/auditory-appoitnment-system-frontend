@@ -1,41 +1,47 @@
 import { useState, useEffect } from "react"
 import { ComboboxSelect, type ComboboxOption } from "@/components/ui/ComboboxSelect"
-import { obtenerEspecialidadesPorFecha, type EspecialidadSolicitud } from "@/services/citaService"
+
+const API_INTEROP_URL = import.meta.env.VITE_INTEROP_API_URL || "http://192.168.0.252:9004/interoperabilidadsis/api/v1"
+
+interface Especialidad {
+  id: string
+  descripcion: string
+  idEspecialidadSgh: string
+}
 
 interface EspecialidadSimpleSelectorProps {
   value: string
   onChange: (value: string) => void
   label?: string
   defaultOpen?: boolean
-  fechaInicio?: string
-  fechaFin?: string
 }
 
 export function EspecialidadSimpleSelector({ 
   value, 
   onChange, 
   label = "Especialidad",
-  defaultOpen = false,
-  fechaInicio,
-  fechaFin
+  defaultOpen = false
 }: EspecialidadSimpleSelectorProps) {
-  const [especialidades, setEspecialidades] = useState<EspecialidadSolicitud[]>([])
+  const [especialidades, setEspecialidades] = useState<Especialidad[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchEspecialidades = async () => {
-      if (!fechaInicio || !fechaFin) {
-        setEspecialidades([])
-        return
-      }
-
       setLoading(true)
       setError(null)
       
       try {
-        const data = await obtenerEspecialidadesPorFecha(fechaInicio, fechaFin)
-        setEspecialidades(data)
+        const response = await fetch(`${API_INTEROP_URL}/especialidad`)
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`)
+        }
+        const result = await response.json()
+        if (result.success && result.data) {
+          setEspecialidades(result.data)
+        } else {
+          setEspecialidades([])
+        }
       } catch (err) {
         console.error("Error cargando especialidades:", err)
         setError("Error al cargar especialidades")
@@ -46,13 +52,13 @@ export function EspecialidadSimpleSelector({
     }
 
     fetchEspecialidades()
-  }, [fechaInicio, fechaFin])
+  }, [])
 
   const options: ComboboxOption[] = [
     { value: "todos", label: "Todas" },
     ...especialidades.map(esp => ({
-      value: esp.idEspecialidad,
-      label: esp.nombre
+      value: esp.idEspecialidadSgh,
+      label: esp.descripcion
     }))
   ]
 

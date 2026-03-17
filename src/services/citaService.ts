@@ -124,7 +124,7 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
   const queryParams = new URLSearchParams({
     desde: desdeStr,
     hasta: hastaStr,
-    especialidad: especialidadFormatted,
+    especialidadSolicitud: especialidadFormatted,
     estado: '4', // Siempre 4 = Atendido
     sis: sis.toString(),
     page: page.toString(),

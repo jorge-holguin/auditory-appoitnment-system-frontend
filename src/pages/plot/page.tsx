@@ -347,8 +347,6 @@ export default function PlotPage() {
                   onChange={setEspecialidad}
                   label="Especialidad"
                   defaultOpen={true}
-                  fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
-                  fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
                 />
                 
                 <EstadoFuaSelector
@@ -389,8 +387,6 @@ export default function PlotPage() {
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
-                fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
-                fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
               />
               
               <EstadoFuaSelector
@@ -438,8 +434,6 @@ export default function PlotPage() {
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
-                fechaInicio={dateRange.start ? `${dateRange.start.year}-${String(dateRange.start.month).padStart(2, '0')}-${String(dateRange.start.day).padStart(2, '0')}` : undefined}
-                fechaFin={dateRange.end ? `${dateRange.end.year}-${String(dateRange.end.month).padStart(2, '0')}-${String(dateRange.end.day).padStart(2, '0')}` : undefined}
               />
               
               <EstadoFuaSelector
