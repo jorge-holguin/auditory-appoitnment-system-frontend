@@ -432,6 +432,7 @@ export interface DetalleLiquidacion {
   importe: number
   descuento: number
   codcpt: string | null
+  cpt: string | null
   clasificadorNombre: string
   ordenId?: string
 }

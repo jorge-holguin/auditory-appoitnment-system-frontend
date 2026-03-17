@@ -213,7 +213,7 @@ export function LiquidacionesModal({
                           <tr key={itemIndex} className="border-b hover:bg-gray-50 transition">
                             <td className="p-3 text-gray-800">{item.item?.trim() || ''}</td>
                             <td className="p-3 text-gray-800">{item.itemNombre}</td>
-                            <td className="p-3 text-center text-gray-800">{item.cpms || '-'}</td>
+                            <td className="p-3 text-center text-gray-800">{item.cpms || item.codcpt || '-'}</td>
                             <td className="p-3 text-center text-gray-800">{item.cantidad}</td>
                             <td className="p-3 text-right text-gray-800">S/. {item.precio.toFixed(2)}</td>
                             <td className="p-3 text-right font-semibold text-gray-900">S/. {item.total.toFixed(2)}</td>
