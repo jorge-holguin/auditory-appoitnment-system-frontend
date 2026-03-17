@@ -48,17 +48,6 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               <p className="text-gray-900 text-base font-medium">{atencion.imc || '-'}</p>
             </div>
           </div>
-
-          <div className="mt-4">
-            <SectionObservation
-              sectionName="OBSERVACION_funciones_vitales"
-              onAddObservation={onAddObservation}
-              hasObservation={hasObservation('OBSERVACION_funciones_vitales')}
-              getObservationText={getObservationText}
-              estado={getObservationEstado?.('OBSERVACION_funciones_vitales')}
-              onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_funciones_vitales') : undefined}
-            />
-          </div>
         </CardContent>
       </Card>
 

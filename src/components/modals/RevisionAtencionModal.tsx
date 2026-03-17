@@ -405,8 +405,8 @@ export function RevisionAtencionModal({
   const getTipoDxBadge = (tipo: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       D: { label: "Definitivo", className: "bg-green-100 text-green-800 border-green-200" },
-      R: { label: "Presuntivo", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
-      P: { label: "Repetido", className: "bg-blue-100 text-blue-800 border-blue-200" }
+      R: { label: "Repetitivo", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+      P: { label: "Presuntivo", className: "bg-blue-100 text-blue-800 border-blue-200" }
     }
     return badges[tipo] || { label: tipo, className: "bg-gray-100 text-gray-800 border-gray-200" }
   }
