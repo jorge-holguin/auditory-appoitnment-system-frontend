@@ -9,7 +9,7 @@ import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
 import { useCatalogos } from "@/contexts/CatalogosContext"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RefreshCw, FilterX, Eye, RotateCcw, Loader2 } from "lucide-react"
+import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Check, X } from "lucide-react"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString } from "@/services/citaService"
@@ -393,13 +393,14 @@ export default function AuditPage() {
                 <TableHead className="font-semibold text-[#114C5F]">MÉDICO</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">FECHA Y HORA</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">ESTADO</TableHead>
+                <TableHead className="font-semibold text-[#114C5F] text-center">FIRMADO</TableHead>
                 <TableHead className="font-semibold text-[#114C5F] text-center">ACCIONES</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={9} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-[#4F9BB6]" />
                       <p className="text-gray-500">Cargando atenciones...</p>
@@ -408,7 +409,7 @@ export default function AuditPage() {
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={9} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <p className="text-red-500 font-medium">Error al cargar datos</p>
                       <p className="text-gray-500 text-sm">{error}</p>
@@ -463,6 +464,17 @@ export default function AuditPage() {
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getEstadoBadge(getEstadoString(atencion.estadoAuditoria as any))}`}>
                       {getEstadoLabel(getEstadoString(atencion.estadoAuditoria as any))}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {atencion.firmado ? (
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
+                        <Check className="w-4 h-4 text-green-600" />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100">
+                        <X className="w-4 h-4 text-red-600" />
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2 justify-center">
@@ -576,6 +588,7 @@ export default function AuditPage() {
             entidadSis: selectedCita.entidadSis
           }}
           estadoAuditoria={getEstadoString(selectedCita.estadoAuditoria as any)}
+          firmado={selectedCita.firmado}
           onAprobar={handleAprobar}
           onRefresh={() => cargarCitas(pagination.page)}
         />

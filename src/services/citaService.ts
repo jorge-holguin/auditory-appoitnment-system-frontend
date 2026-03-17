@@ -78,6 +78,7 @@ export interface Cita {
   estado: string // Estado de la API (4 = Atendido)
   estadoAuditoria?: string // Estado de auditoría (PENDIENTE, EN_REVISION, APROBADO, OBSERVADO)
   especialidad?: string
+  firmado?: boolean // Indica si el FUA está firmado digitalmente
   // Campos adicionales que pueda tener la API
   [key: string]: any
 }

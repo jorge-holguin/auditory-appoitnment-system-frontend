@@ -24,17 +24,23 @@ interface PdfReviewModalProps {
   citaId: string
   citaContext: CitaContext
   estadoAuditoria?: string
+  firmado?: boolean
   onAprobar?: () => void
   onRefresh?: () => void
 }
 
 const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
+const API_CONSULTA_EXTERNA_URL = import.meta.env.VITE_CONSULTA_EXTERNA_URL
 
-export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAuditoria, onAprobar, onRefresh }: PdfReviewModalProps) {
+export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAuditoria, firmado, onAprobar, onRefresh }: PdfReviewModalProps) {
   const [loading, setLoading] = useState(false)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const pdfUrl = `${API_CITAS_URL}/reporte/fua?citaId=${citaId}`
+  
+  // Si está firmado, usar el endpoint de documento firmado, sino usar el endpoint por defecto
+  const pdfUrl = firmado 
+    ? `${API_CONSULTA_EXTERNA_URL}/Fua056/getDocumentoFirmado?idDocumento=${citaId}&idTipoDocumento=10`
+    : `${API_CITAS_URL}/reporte/fua?citaId=${citaId}`
   
   // Estados derivados para control de botones
   const isAprobado = estadoAuditoria === "APROBADO"

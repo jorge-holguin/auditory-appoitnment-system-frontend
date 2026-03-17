@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X } from "lucide-react"
 
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
@@ -522,22 +522,24 @@ export default function PlotPage() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Cuenta</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Médico</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Firmado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Cargando FUAs...
                       </td>
                     </tr>
                   ) : fuas.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         {especialidad === "todos" 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
                           : "No se encontraron FUAs con los filtros seleccionados"}
@@ -569,6 +571,7 @@ export default function PlotPage() {
                       <td className="px-4 py-3 text-sm">{(fua as any).idCuenta || fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{fua.medico || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).tipoAtencion?.trim() || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">
                           <span
@@ -586,6 +589,17 @@ export default function PlotPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{fua.nombreEspecialidad || fua.especialidad || 'N/A'}</td>
+                        <td className="px-4 py-3 text-center">
+                          {fua.firmado ? (
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
+                              <Check className="w-4 h-4 text-green-600" />
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100">
+                              <X className="w-4 h-4 text-red-600" />
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

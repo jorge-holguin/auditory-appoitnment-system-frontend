@@ -12,6 +12,8 @@ export interface Fua {
   nombreEspecialidad?: string
   estado: string
   fechaAtencion: string
+  medico?: string // Nombre del médico
+  firmado?: boolean // Indica si el FUA está firmado digitalmente
 }
 
 export interface ListarFuasParams {
