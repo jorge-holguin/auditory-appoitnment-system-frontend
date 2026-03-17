@@ -370,10 +370,7 @@ export default function AuditPage() {
                 onChange={setMedico}
                 fechaInicio={selectedDate}
                 fechaFin={selectedDate}
-                idEspecialidad={
-                  especialidades.find(e => e.id === especialidad)?.idEspecialidadSgh || 
-                  especialidad
-                }
+                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
               />
             </div>}
 

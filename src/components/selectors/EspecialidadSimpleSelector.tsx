@@ -55,7 +55,7 @@ export function EspecialidadSimpleSelector({
   }, [])
 
   const options: ComboboxOption[] = [
-    { value: "todos", label: "Todas" },
+    { value: "todos", label: "TODOS SIS" },
     ...especialidades.map(esp => ({
       value: esp.idEspecialidadSgh,
       label: esp.descripcion

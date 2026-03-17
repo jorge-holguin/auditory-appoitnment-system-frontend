@@ -13,11 +13,12 @@ interface MedicoSelectorProps {
   fechaInicio?: Date
   fechaFin?: Date
   idEspecialidad?: string
+  idEspecialidadSolicitud?: string 
 }
 
 const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
 
-async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspecialidad: string): Promise<Medico[]> {
+async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspecialidadSolicitud: string): Promise<Medico[]> {
   const formatDate = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -25,7 +26,7 @@ async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspec
     return `${year}-${month}-${day}`
   }
 
-  const url = `${API_CITAS_URL}/cita/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidad=${idEspecialidad}`
+  const url = `${API_CITAS_URL}/cita/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidadSolicitud=${idEspecialidadSolicitud}`
 
   try {
     const response = await fetch(url, {
@@ -53,7 +54,7 @@ export function MedicoSelector({
   label = "Médico",
   fechaInicio,
   fechaFin,
-  idEspecialidad = "0001"
+  idEspecialidadSolicitud = "0001"
 }: MedicoSelectorProps) {
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [loading, setLoading] = useState(false)
@@ -61,10 +62,10 @@ export function MedicoSelector({
   const lastFetchRef = useRef<string>('')
 
   const cargarMedicos = async () => {
-    if (!fechaInicio || !fechaFin || !idEspecialidad) return
+    if (!fechaInicio || !fechaFin || !idEspecialidadSolicitud) return
 
     // Crear una clave única para esta petición
-    const fetchKey = `${fechaInicio.toISOString()}-${fechaFin.toISOString()}-${idEspecialidad}`
+    const fetchKey = `${fechaInicio.toISOString()}-${fechaFin.toISOString()}-${idEspecialidadSolicitud}`
     
     // Si ya se hizo esta petición, no la repetimos
     if (lastFetchRef.current === fetchKey) {
@@ -76,7 +77,7 @@ export function MedicoSelector({
     setError(null)
 
     try {
-      const data = await obtenerMedicosPorFecha(fechaInicio, fechaFin, idEspecialidad)
+      const data = await obtenerMedicosPorFecha(fechaInicio, fechaFin, idEspecialidadSolicitud)
       setMedicos(data)
     } catch (err) {
       setError("Error al cargar médicos")
@@ -87,7 +88,7 @@ export function MedicoSelector({
   }
 
   useEffect(() => {
-    if (fechaInicio && fechaFin && idEspecialidad) {
+    if (fechaInicio && fechaFin && idEspecialidadSolicitud) {
       // Pequeño delay para evitar múltiples llamadas rápidas
       const timer = setTimeout(() => {
         cargarMedicos()
@@ -100,7 +101,7 @@ export function MedicoSelector({
       lastFetchRef.current = ''
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fechaInicio, fechaFin, idEspecialidad])
+  }, [fechaInicio, fechaFin, idEspecialidadSolicitud])
 
   const options = [
     { value: "todos", label: "Todos los médicos" },
