@@ -1,6 +1,6 @@
-﻿import { useState, useEffect, useMemo } from "react"
+﻿import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X, ChevronDown, Search } from "lucide-react"
 
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
@@ -28,14 +28,51 @@ import type { DateValue } from "@internationalized/date"
 import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse, type ErrorDetalle } from "@/services/tramaService"
 import { format } from "date-fns"
 import { parseDate } from "@internationalized/date"
-import { MedicoSelector } from "@/components/selectors/MedicoSelector"
+
+// Función para obtener médicos del backend
+interface Medico {
+  nombre: string
+  medicoId: string
+}
+
+const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
+
+async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspecialidadSolicitud: string): Promise<Medico[]> {
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const url = `${API_CITAS_URL}/cita/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidadSolicitud=${idEspecialidadSolicitud}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "application/json"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener médicos: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error en obtenerMedicosPorFecha:", error)
+    throw error
+  }
+}
 
 
 export default function PlotPage() {
   // Estados para filtros
   const [origen, setOrigen] = useState<string>("CE")
   const [especialidad, setEspecialidad] = useState<string>("0001") // TERAPIA FISICA
-  const [medico, setMedico] = useState<string>("todos")
+  const [medicosSeleccionados, setMedicosSeleccionados] = useState<Set<string>>(new Set())
   const [estado, setEstado] = useState<string>("2")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
   const [filtroFirmado, setFiltroFirmado] = useState<string>("FIRMADO")
@@ -64,7 +101,12 @@ export default function PlotPage() {
     return new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day)
   }, [dateRange.end?.year, dateRange.end?.month, dateRange.end?.day])
   
-  // Estados para datos
+  // Estado para búsqueda de médicos en el dropdown
+  const [busquedaMedico, setBusquedaMedico] = useState<string>("")
+  const [medicoDropdownOpen, setMedicoDropdownOpen] = useState(false)
+  const medicoDropdownRef = useRef<HTMLDivElement>(null)
+  const [medicosDisponibles, setMedicosDisponibles] = useState<Medico[]>([])
+  const [loadingMedicos, setLoadingMedicos] = useState(false)
   const [fuas, setFuas] = useState<Fua[]>([])
   const [loading, setLoading] = useState(false)
   const [cargandoEnvioPaquete, setCargandoEnvioPaquete] = useState(false)
@@ -118,6 +160,38 @@ export default function PlotPage() {
     const nombreArchivo = `errores_${generatedFileName.replace('.zip', '')}_${format(new Date(), "yyyyMMdd_HHmmss")}.txt`
     descargarBlob(blob, nombreArchivo)
   }
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (medicoDropdownRef.current && !medicoDropdownRef.current.contains(event.target as Node)) {
+        setMedicoDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+  useEffect(() => {
+    const cargarMedicos = async () => {
+      if (!fechaInicioMemo || !fechaFinMemo || !especialidad || especialidad === "todos") {
+        setMedicosDisponibles([])
+        return
+      }
+
+      setLoadingMedicos(true)
+      try {
+        const data = await obtenerMedicosPorFecha(fechaInicioMemo, fechaFinMemo, especialidad)
+        setMedicosDisponibles(data)
+      } catch (error) {
+        console.error("Error al cargar médicos:", error)
+        setMedicosDisponibles([])
+      } finally {
+        setLoadingMedicos(false)
+      }
+    }
+
+    cargarMedicos()
+  }, [fechaInicioMemo, fechaFinMemo, especialidad])
 
   // Cargar FUAs al montar y cuando cambien los filtros
   useEffect(() => {
@@ -298,7 +372,7 @@ export default function PlotPage() {
   const handleLimpiarFiltros = () => {
     setOrigen("CE")
     setEspecialidad("0001") // TERAPIA FISICA
-    setMedico("todos")
+    setMedicosSeleccionados(new Set())
     setEstado("2")
     setTurno("TODOS")
     setFiltroFirmado("FIRMADO")
@@ -309,7 +383,7 @@ export default function PlotPage() {
     setCurrentPage(0)
   }
 
-  // Filtrar FUAs por búsqueda de número de FUA y por estado de firmado (frontend)
+  // Filtrar FUAs por búsqueda de número de FUA, por estado de firmado y por médico (frontend)
   const fuasFiltradas = fuas.filter(fua => {
     // Filtro por búsqueda de texto
     const matchesBusqueda = !busquedaFua.trim() || 
@@ -321,7 +395,11 @@ export default function PlotPage() {
       (filtroFirmado === "FIRMADO" && fua.firmado === true) ||
       (filtroFirmado === "NO_FIRMADO" && fua.firmado === false)
     
-    return matchesBusqueda && matchesFirmado
+    // Filtro por médico (frontend) - si no hay médicos seleccionados, muestra todos
+    const matchesMedico = medicosSeleccionados.size === 0 || 
+      medicosSeleccionados.has(fua.medico || '')
+    
+    return matchesBusqueda && matchesFirmado && matchesMedico
   })
 
   const totalPages = Math.max(1, Math.ceil(fuasFiltradas.length / pageSize) || 1)
@@ -378,7 +456,7 @@ export default function PlotPage() {
             </div>
             
             {/* Fila 2: Especialidad - Médico - Turno */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
               <EspecialidadSimpleSelector
                 value={especialidad}
                 onChange={setEspecialidad}
@@ -386,14 +464,99 @@ export default function PlotPage() {
                 defaultOpen={true}
               />
               
-              <MedicoSelector
-                value={medico}
-                onChange={setMedico}
-                label="Médico"
-                fechaInicio={fechaInicioMemo}
-                fechaFin={fechaFinMemo}
-                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
-              />
+              {/* Selector de Médicos con Dropdown y Checkboxes */}
+              <div className="relative" ref={medicoDropdownRef}>
+                <label className="block text-sm font-medium text-[#114C5F] mb-2">
+                  Médicos
+                </label>
+                <button
+                  onClick={() => setMedicoDropdownOpen(!medicoDropdownOpen)}
+                  className="w-full px-3 py-2 border border-[#9CD2D3] rounded-md bg-white text-left flex items-center justify-between hover:border-[#4F9BB6] transition-colors"
+                >
+                  <span className="text-sm text-gray-700 truncate">
+                    {medicosSeleccionados.size === 0 
+                      ? "Todos los médicos" 
+                      : `${medicosSeleccionados.size} médico(s) seleccionado(s)`}
+                  </span>
+                  {loadingMedicos ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  ) : (
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${medicoDropdownOpen ? 'rotate-180' : ''}`} />
+                  )}
+                </button>
+                
+                {medicoDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#9CD2D3] rounded-md shadow-lg max-h-[250px] flex flex-col">
+                    {/* Búsqueda */}
+                    <div className="p-2 border-b border-gray-100">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={busquedaMedico}
+                          onChange={(e) => setBusquedaMedico(e.target.value)}
+                          placeholder="Buscar médico..."
+                          className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-[#4F9BB6]"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Lista de checkboxes */}
+                    <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                      {medicosDisponibles.length === 0 ? (
+                        <span className="text-sm text-gray-500 italic block py-2">
+                          {loadingMedicos ? "Cargando..." : "No hay médicos disponibles"}
+                        </span>
+                      ) : (
+                        medicosDisponibles
+                          .filter(med => med.medicoId.toLowerCase().includes(busquedaMedico.toLowerCase()))
+                          .sort((a, b) => a.medicoId.localeCompare(b.medicoId))
+                          .map((med) => (
+                            <div key={med.nombre} className="flex items-center space-x-2 py-1 hover:bg-gray-50 rounded px-1">
+                              <Checkbox
+                                id={`med-dropdown-${med.nombre}`}
+                                checked={medicosSeleccionados.has(med.medicoId)}
+                                onCheckedChange={(checked) => {
+                                  setMedicosSeleccionados(prev => {
+                                    const newSet = new Set(prev)
+                                    if (checked) {
+                                      newSet.add(med.medicoId)
+                                    } else {
+                                      newSet.delete(med.medicoId)
+                                    }
+                                    return newSet
+                                  })
+                                }}
+                              />
+                              <label
+                                htmlFor={`med-dropdown-${med.nombre}`}
+                                className="text-sm text-gray-700 cursor-pointer truncate flex-1"
+                                title={`${med.medicoId} (${med.nombre})`}
+                              >
+                                {med.medicoId}
+                              </label>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                    
+                    {/* Footer con limpiar */}
+                    {medicosSeleccionados.size > 0 && (
+                      <div className="p-2 border-t border-gray-100 bg-gray-50">
+                        <button
+                          onClick={() => {
+                            setMedicosSeleccionados(new Set())
+                            setBusquedaMedico("")
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline w-full text-left"
+                        >
+                          Limpiar selección ({medicosSeleccionados.size})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               
               <TurnoSelector
                 value={turno}
