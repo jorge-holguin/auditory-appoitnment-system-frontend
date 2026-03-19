@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react"
+﻿import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X } from "lucide-react"
 
@@ -52,6 +52,17 @@ export default function PlotPage() {
     start: todayParsed,
     end: todayParsed,
   })
+
+  // Memoizar fechas para evitar recreación en cada render (evita múltiples llamadas a la API de médicos)
+  const fechaInicioMemo = useMemo(() => {
+    if (!dateRange.start) return undefined
+    return new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day)
+  }, [dateRange.start?.year, dateRange.start?.month, dateRange.start?.day])
+
+  const fechaFinMemo = useMemo(() => {
+    if (!dateRange.end) return undefined
+    return new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day)
+  }, [dateRange.end?.year, dateRange.end?.month, dateRange.end?.day])
   
   // Estados para datos
   const [fuas, setFuas] = useState<Fua[]>([])
@@ -338,108 +349,20 @@ export default function PlotPage() {
         </div>
         
         <div>
-          {/* Filtros responsive */}
+          {/* Filtros responsive - Una sola instancia de cada componente */}
           <div className="space-y-4 mb-6">
-            {/* Desktop: Tres filas con 3 columnas cada una */}
-            <div className="hidden lg:flex lg:flex-col gap-3">
-              {/* Fila 1: Fecha - Origen - Firmado */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <div className="relative">
-                    <DateRangePickerAria
-                      value={dateRange}
-                      onChange={setDateRange}
-                      label="Fecha"
-                    />
-                    <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                
-                <OrigenSelector
-                  value={origen}
-                  onChange={setOrigen}
-                  label="Origen"
-                />
-                
-                <FirmadoSelector
-                  value={filtroFirmado}
-                  onChange={setFiltroFirmado}
-                  label="Firmado"
-                />
-              </div>
-              
-              {/* Fila 2: Especialidad - Médico - Turno */}
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <EspecialidadSimpleSelector
-                  value={especialidad}
-                  onChange={setEspecialidad}
-                  label="Especialidad"
-                  defaultOpen={true}
-                />
-                
-                <MedicoSelector
-                  value={medico}
-                  onChange={setMedico}
-                  label="Médico"
-                  fechaInicio={new Date(dateRange.start?.year || 0, (dateRange.start?.month || 1) - 1, dateRange.start?.day || 1)}
-                  fechaFin={new Date(dateRange.end?.year || 0, (dateRange.end?.month || 1) - 1, dateRange.end?.day || 1)}
-                  idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
-                />
-                
-                <TurnoSelector
-                  value={turno}
-                  onChange={setTurno}
-                />
-              </div>
-
-              {/* Fila 3: Buscar FUA - Estado - Botón Generar Paquete */}
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <div>
-                  <label className="block text-sm font-medium text-[#114C5F] mb-2">
-                    Buscar por N° FUA
-                  </label>
-                  <input
-                    type="text"
-                    value={busquedaFua}
-                    onChange={(e) => setBusquedaFua(e.target.value)}
-                    placeholder="Ingrese número de FUA..."
-                    className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
+            {/* Fila 1: Fecha - Origen - Firmado */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <div className="relative">
+                  <DateRangePickerAria
+                    value={dateRange}
+                    onChange={setDateRange}
+                    label="Fecha"
                   />
+                  <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none hidden lg:block" />
                 </div>
-
-                <EstadoFuaSelector
-                  value={estado}
-                  onChange={setEstado}
-                  label="Estado"
-                />
-                
-                <Button 
-                  onClick={handleGenerarPaquete}
-                  disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
-                  className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
-                >
-                  {cargandoEnvioPaquete ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generando...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4 mr-2" />
-                      Generar Paquete
-                    </>
-                  )}
-                </Button>
               </div>
-            </div>
-
-            {/* Tablet: 3x3 + buscador + estado + botón */}
-            <div className="hidden md:grid lg:hidden md:grid-cols-3 gap-3">
-              <DateRangePickerAria
-                value={dateRange}
-                onChange={setDateRange}
-                label="Fecha"
-              />
               
               <OrigenSelector
                 value={origen}
@@ -452,19 +375,23 @@ export default function PlotPage() {
                 onChange={setFiltroFirmado}
                 label="Firmado"
               />
-              
+            </div>
+            
+            {/* Fila 2: Especialidad - Médico - Turno */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <EspecialidadSimpleSelector
                 value={especialidad}
                 onChange={setEspecialidad}
                 label="Especialidad"
+                defaultOpen={true}
               />
               
               <MedicoSelector
                 value={medico}
                 onChange={setMedico}
                 label="Médico"
-                fechaInicio={new Date(dateRange.start?.year || 0, (dateRange.start?.month || 1) - 1, dateRange.start?.day || 1)}
-                fechaFin={new Date(dateRange.end?.year || 0, (dateRange.end?.month || 1) - 1, dateRange.end?.day || 1)}
+                fechaInicio={fechaInicioMemo}
+                fechaFin={fechaFinMemo}
                 idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
               />
               
@@ -472,85 +399,10 @@ export default function PlotPage() {
                 value={turno}
                 onChange={setTurno}
               />
-              
-              <div>
-                <label className="block text-sm font-medium text-[#114C5F] mb-2">
-                  Buscar por N° FUA
-                </label>
-                <input
-                  type="text"
-                  value={busquedaFua}
-                  onChange={(e) => setBusquedaFua(e.target.value)}
-                  placeholder="Ingrese número de FUA..."
-                  className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
-                />
-              </div>
-              
-              <EstadoFuaSelector
-                value={estado}
-                onChange={setEstado}
-                label="Estado"
-              />
-              
-              <Button 
-                onClick={handleGenerarPaquete}
-                disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
-                className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
-              >
-                {cargandoEnvioPaquete ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Generar Paquete
-                  </>
-                )}
-              </Button>
             </div>
 
-            {/* Mobile: Columna única */}
-            <div className="grid md:hidden grid-cols-1 gap-3">
-              <DateRangePickerAria
-                value={dateRange}
-                onChange={setDateRange}
-                label="Fecha"
-              />
-              
-              <OrigenSelector
-                value={origen}
-                onChange={setOrigen}
-                label="Origen"
-              />
-              
-              <FirmadoSelector
-                value={filtroFirmado}
-                onChange={setFiltroFirmado}
-                label="Firmado"
-              />
-              
-              <EspecialidadSimpleSelector
-                value={especialidad}
-                onChange={setEspecialidad}
-                label="Especialidad"
-              />
-              
-              <MedicoSelector
-                value={medico}
-                onChange={setMedico}
-                label="Médico"
-                fechaInicio={new Date(dateRange.start?.year || 0, (dateRange.start?.month || 1) - 1, dateRange.start?.day || 1)}
-                fechaFin={new Date(dateRange.end?.year || 0, (dateRange.end?.month || 1) - 1, dateRange.end?.day || 1)}
-                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
-              />
-              
-              <TurnoSelector
-                value={turno}
-                onChange={setTurno}
-              />
-              
+            {/* Fila 3: Buscar FUA - Estado - Botón Generar Paquete */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <div>
                 <label className="block text-sm font-medium text-[#114C5F] mb-2">
                   Buscar por N° FUA
@@ -563,7 +415,7 @@ export default function PlotPage() {
                   className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
                 />
               </div>
-              
+
               <EstadoFuaSelector
                 value={estado}
                 onChange={setEstado}

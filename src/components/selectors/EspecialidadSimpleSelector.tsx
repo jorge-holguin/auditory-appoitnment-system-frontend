@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ComboboxSelect, type ComboboxOption } from "@/components/ui/ComboboxSelect"
 
-const API_INTEROP_URL = import.meta.env.VITE_INTEROP_API_URL || "http://192.168.0.252:9004/interoperabilidadsis/api/v1"
+const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL || "http://192.168.0.252:9004/interoperabilidadsis/api/v1"
 
 interface Especialidad {
   id: string
@@ -25,8 +25,13 @@ export function EspecialidadSimpleSelector({
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasFetchedRef = useRef(false)
 
   useEffect(() => {
+    // Evitar llamadas duplicadas (StrictMode en desarrollo)
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
+
     const fetchEspecialidades = async () => {
       setLoading(true)
       setError(null)
