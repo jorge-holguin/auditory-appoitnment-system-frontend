@@ -6,6 +6,7 @@ import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { EstadoFuaSelector } from "@/components/selectors/EstadoFuaSelector"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
+import { FirmadoSelector } from "@/components/selectors/FirmadoSelector"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePickerAria } from "@/components/ui/DateRangePickerAria"
 import {
@@ -35,6 +36,8 @@ export default function PlotPage() {
   const [especialidad, setEspecialidad] = useState<string>("todos")
   const [estado, setEstado] = useState<string>("2")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
+  const [filtroFirmado, setFiltroFirmado] = useState<string>("FIRMADO")
+  const [busquedaFua, setBusquedaFua] = useState<string>("")
   
   // Estado para selección de FUAs
   const [selectedFuas, setSelectedFuas] = useState<Set<string>>(new Set())
@@ -109,7 +112,7 @@ export default function PlotPage() {
       cargarFuas()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origen, especialidad, estado, turno, dateRange])
+  }, [origen, especialidad, estado, turno, filtroFirmado, dateRange])
 
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
@@ -136,10 +139,13 @@ export default function PlotPage() {
         idOrigen: origen !== "todos" ? origen : "CE",
         idEstado: estado !== "todos" ? parseInt(estado) : 2,
         idEspecialidad: especialidad !== "todos" ? especialidad : undefined,
-        turnoConsulta: turno !== "TODOS" ? turno : undefined
+        turnoConsulta: turno !== "TODOS" ? turno : undefined,
+        firmado: filtroFirmado !== "TODOS" ? filtroFirmado : undefined
       }
 
       const data = await listarFuas(params)
+      console.log("Params enviados:", params)
+      console.log("FUAs recibidos:", data.length)
       setFuas(data)
       setCurrentPage(0)
     } catch (error) {
@@ -280,17 +286,34 @@ export default function PlotPage() {
     setOrigen("CE")
     setEspecialidad("todos")
     setEstado("2")
+    setFiltroFirmado("FIRMADO")
+    setBusquedaFua("")
     const today = new Date()
     const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
     setDateRange({ start: todayParsed, end: todayParsed })
     setCurrentPage(0)
   }
 
-  const totalPages = Math.max(1, Math.ceil(fuas.length / pageSize) || 1)
+  // Filtrar FUAs por búsqueda de número de FUA y por estado de firmado (frontend)
+  const fuasFiltradas = fuas.filter(fua => {
+    // Filtro por búsqueda de texto
+    const matchesBusqueda = !busquedaFua.trim() || 
+      fua.numeroFua?.toLowerCase().includes(busquedaFua.toLowerCase()) ||
+      fua.id?.toLowerCase().includes(busquedaFua.toLowerCase())
+    
+    // Filtro por firmado
+    const matchesFirmado = filtroFirmado === "TODOS" || 
+      (filtroFirmado === "FIRMADO" && fua.firmado === true) ||
+      (filtroFirmado === "NO_FIRMADO" && fua.firmado === false)
+    
+    return matchesBusqueda && matchesFirmado
+  })
+
+  const totalPages = Math.max(1, Math.ceil(fuasFiltradas.length / pageSize) || 1)
   const safeCurrentPage = Math.min(currentPage, totalPages - 1)
   const startIndex = safeCurrentPage * pageSize
   const endIndex = startIndex + pageSize
-  const pageFuas = fuas.slice(startIndex, endIndex)
+  const pageFuas = fuasFiltradas.slice(startIndex, endIndex)
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -340,7 +363,7 @@ export default function PlotPage() {
                 />
               </div>
               
-              {/* Fila 2: Especialidad - Estado - Botón Generar */}
+              {/* Fila 2: Especialidad - Estado - Firmado */}
               <div className="grid grid-cols-3 gap-3 items-end">
                 <EspecialidadSimpleSelector
                   value={especialidad}
@@ -354,10 +377,32 @@ export default function PlotPage() {
                   onChange={setEstado}
                   label="Estado"
                 />
+
+                <FirmadoSelector
+                  value={filtroFirmado}
+                  onChange={setFiltroFirmado}
+                  label="Firmado"
+                />
+              </div>
+
+              {/* Fila 3: Buscador por N° FUA + Botón Generar Paquete */}
+              <div className="grid grid-cols-4 gap-3 items-end">
+                <div className="col-span-3">
+                  <label className="block text-sm font-medium text-[#114C5F] mb-2">
+                    Buscar por N° FUA
+                  </label>
+                  <input
+                    type="text"
+                    value={busquedaFua}
+                    onChange={(e) => setBusquedaFua(e.target.value)}
+                    placeholder="Ingrese número de FUA..."
+                    className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
+                  />
+                </div>
                 
                 <Button 
                   onClick={handleGenerarPaquete}
-                  disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                  disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
                   className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
                 >
                   {cargandoEnvioPaquete ? (
@@ -375,7 +420,7 @@ export default function PlotPage() {
               </div>
             </div>
 
-            {/* Tablet: 2x2 + botón */}
+            {/* Tablet: 2x3 + buscador + botón */}
             <div className="hidden md:grid lg:hidden md:grid-cols-2 gap-3">
               <OrigenSelector
                 value={origen}
@@ -394,17 +439,37 @@ export default function PlotPage() {
                 onChange={setEstado}
                 label="Estado"
               />
+
+              <FirmadoSelector
+                value={filtroFirmado}
+                onChange={setFiltroFirmado}
+                label="Firmado"
+              />
               
               <DateRangePickerAria
                 value={dateRange}
                 onChange={setDateRange}
                 label="Fecha"
               />
+
+              {/* Buscador por N° FUA */}
+              <div>
+                <label className="block text-sm font-medium text-[#114C5F] mb-2">
+                  Buscar por N° FUA
+                </label>
+                <input
+                  type="text"
+                  value={busquedaFua}
+                  onChange={(e) => setBusquedaFua(e.target.value)}
+                  placeholder="Ingrese número de FUA..."
+                  className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
+                />
+              </div>
               
               <div className="col-span-2">
                 <Button 
                   onClick={handleGenerarPaquete}
-                  disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                  disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
                   className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
                 >
                   {cargandoEnvioPaquete ? (
@@ -441,16 +506,36 @@ export default function PlotPage() {
                 onChange={setEstado}
                 label="Estado"
               />
+
+              <FirmadoSelector
+                value={filtroFirmado}
+                onChange={setFiltroFirmado}
+                label="Firmado"
+              />
               
               <DateRangePickerAria
                 value={dateRange}
                 onChange={setDateRange}
                 label="Fecha"
               />
+
+              {/* Buscador por N° FUA */}
+              <div>
+                <label className="block text-sm font-medium text-[#114C5F] mb-2">
+                  Buscar por N° FUA
+                </label>
+                <input
+                  type="text"
+                  value={busquedaFua}
+                  onChange={(e) => setBusquedaFua(e.target.value)}
+                  placeholder="Ingrese número de FUA..."
+                  className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
+                />
+              </div>
               
               <Button 
                 onClick={handleGenerarPaquete}
-                disabled={cargandoEnvioPaquete || loading || fuas.length === 0}
+                disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
                 className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
               >
                 {cargandoEnvioPaquete ? (
@@ -519,7 +604,7 @@ export default function PlotPage() {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Cuenta</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° FUA</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Médico</th>
@@ -537,11 +622,13 @@ export default function PlotPage() {
                         Cargando FUAs...
                       </td>
                     </tr>
-                  ) : fuas.length === 0 ? (
+                  ) : fuasFiltradas.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         {especialidad === "todos" 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
+                          : busquedaFua.trim()
+                          ? `No se encontraron FUAs con el número "${busquedaFua}"`
                           : "No se encontraron FUAs con los filtros seleccionados"}
                       </td>
                     </tr>
@@ -568,7 +655,7 @@ export default function PlotPage() {
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm">{(fua as any).idCuenta || fua.id}</td>
+                      <td className="px-4 py-3 text-sm font-mono">{fua.numeroFua || (fua as any).idCuenta || fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{fua.medico || 'N/A'}</td>
@@ -612,7 +699,7 @@ export default function PlotPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4">
             <div className="flex items-center gap-4">
               <span>
-                Mostrando {fuas.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, fuas.length)} de {fuas.length} registros
+                Mostrando {fuasFiltradas.length === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, fuasFiltradas.length)} de {fuasFiltradas.length} registros
               </span>
               {selectedFuas.size > 0 && (
                 <span className="text-sm font-medium text-[#4F9BB6]">

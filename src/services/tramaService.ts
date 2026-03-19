@@ -23,6 +23,7 @@ export interface ListarFuasParams {
   idEstado: number
   idEspecialidad?: string
   turnoConsulta?: string // M = Mañana, T = Tarde
+  firmado?: string // FIRMADO, NO_FIRMADO, TODOS
 }
 
 export interface DescargarZipRequest {
@@ -53,6 +54,11 @@ export async function listarFuas(params: ListarFuasParams): Promise<Fua[]> {
   // Agregar turno solo si está definido y no es "TODOS"
   if (params.turnoConsulta && params.turnoConsulta !== "TODOS") {
     queryParams.append("turnoConsulta", params.turnoConsulta)
+  }
+
+  // Agregar filtro de firmado solo si está definido y no es "TODOS"
+  if (params.firmado && params.firmado !== "TODOS") {
+    queryParams.append("firmado", params.firmado === "FIRMADO" ? "true" : "false")
   }
 
   const url = `${API_INTEROP_URL}/fua/listarFuas?${queryParams.toString()}`
