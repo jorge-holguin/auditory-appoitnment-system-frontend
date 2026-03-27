@@ -2,7 +2,9 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye } from "lucide-react"
+import { obtenerCitaIdPorAtencion } from "@/services/citaService"
+import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import {
@@ -73,6 +75,28 @@ interface VerificacionReglasResponse {
 }
 
 export default function PackagesPage() {
+  // Estados para el modal de revisión de FUA
+  const [modalRevisarOpen, setModalRevisarOpen] = useState(false)
+  const [modalCitaId, setModalCitaId] = useState<string>("")
+  const [modalDetalle, setModalDetalle] = useState<DetallePaquete | null>(null)
+  const [loadingVerAtencion, setLoadingVerAtencion] = useState<string | null>(null)
+
+  // Función para ver FUA en modal de revisión
+  const handleVerAtencion = async (detalle: DetallePaquete) => {
+    setLoadingVerAtencion(detalle.idAtencion)
+    try {
+      const citaId = await obtenerCitaIdPorAtencion(detalle.idAtencion)
+      setModalCitaId(citaId)
+      setModalDetalle(detalle)
+      setModalRevisarOpen(true)
+    } catch (error) {
+      console.error("Error al obtener cita ID:", error)
+      alert("No se pudo obtener el ID de cita para esta atención.")
+    } finally {
+      setLoadingVerAtencion(null)
+    }
+  }
+
   const [estado, setEstado] = useState<string>("todos")
   const [numeroPaquete, setNumeroPaquete] = useState<string>("")
   const [paqueteSeleccionado, setPaqueteSeleccionado] = useState<Paquete | null>(null)
@@ -411,27 +435,30 @@ export default function PackagesPage() {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">ID Atención</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">N° FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Estado del FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observaciones</th>
+                          <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {loadingDetalles ? (
                           <tr>
-                            <td colSpan={3} className="px-4 py-8 text-center text-gray-500 text-xs">
+                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-xs">
                               Cargando detalles...
                             </td>
                           </tr>
                         ) : detallesPaquete.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="px-4 py-8 text-center text-gray-500 text-xs">
+                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-xs">
                               No hay detalles disponibles
                             </td>
                           </tr>
                         ) : (
                           detallesPaquete.map((detalle) => (
                             <tr key={detalle.id} className="border-b hover:bg-gray-50">
+                              <td className="px-4 py-2 text-xs font-mono">{detalle.idAtencion}</td>
                               <td className="px-4 py-2 text-xs">{detalle.numeroFua}</td>
                               <td className="px-4 py-2 text-xs">
                                 <span
@@ -461,6 +488,21 @@ export default function PackagesPage() {
                                 ) : (
                                   <span className="text-[11px] text-gray-400">Sin observaciones</span>
                                 )}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleVerAtencion(detalle)}
+                                  disabled={loadingVerAtencion === detalle.idAtencion}
+                                  className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white text-xs h-6 px-2"
+                                >
+                                  {loadingVerAtencion === detalle.idAtencion ? (
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <Eye className="w-3 h-3 mr-1" />
+                                  )}
+                                  Ver
+                                </Button>
                               </td>
                             </tr>
                           ))
@@ -664,6 +706,29 @@ export default function PackagesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Revisión de FUA */}
+      {modalDetalle && (
+        <PdfReviewModal
+          open={modalRevisarOpen}
+          onClose={() => setModalRevisarOpen(false)}
+          citaId={modalCitaId}
+          firmado={modalDetalle.estado !== "OBSERVADO"}
+          requireRevert
+          citaContext={{
+            paciente: '',
+            fecha: modalDetalle.fechaCreacion || '',
+            hora: '',
+            consultorioNombre: '',
+            medicoNombre: '',
+            seguroNombre: '',
+            historia: '',
+            seguro: '',
+            numRef: '',
+            entidadSis: '',
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -519,3 +519,29 @@ export async function eliminarItemLiquidacion(cuentaId: number, item: string, or
   }
 }
 
+/**
+ * Obtiene el ID de cita a partir del ID de atención seguro
+ * Usa el endpoint: /api/cita/{idAtencionSeguro}/cita-id-fua
+ */
+export async function obtenerCitaIdPorAtencion(idAtencionSeguro: string): Promise<string> {
+  const url = `${API_CITAS_URL}/cita/${idAtencionSeguro}/cita-id-fua`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "*/*"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener cita ID: ${response.status} ${response.statusText}`)
+    }
+
+    const citaId = await response.text()
+    return citaId.trim()
+  } catch (error) {
+    console.error("Error en obtenerCitaIdPorAtencion:", error)
+    throw error
+  }
+}

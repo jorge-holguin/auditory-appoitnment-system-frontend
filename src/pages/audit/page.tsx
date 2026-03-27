@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
@@ -35,13 +36,25 @@ registerLocale('es', esCustom)
 
 export default function AuditPage() {
   const { especialidades } = useCatalogos()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [origen, setOrigen] = useState("CE")
   const [especialidad, setEspecialidad] = useState("todos")
   const [estado, setEstado] = useState("PENDIENTE")
   const [medico, setMedico] = useState("todos")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
-  const [citaId, setCitaId] = useState("")
-  const [mostrarBusquedaCita, setMostrarBusquedaCita] = useState(false)
+  const [citaId, setCitaId] = useState(searchParams.get("citaId") || "")
+  const [mostrarBusquedaCita, setMostrarBusquedaCita] = useState(!!searchParams.get("citaId"))
+
+  // Leer citaId de URL params al montar
+  useEffect(() => {
+    const citaIdParam = searchParams.get("citaId")
+    if (citaIdParam) {
+      setCitaId(citaIdParam)
+      setMostrarBusquedaCita(true)
+      // Limpiar el param de la URL para no re-disparar
+      setSearchParams({}, { replace: true })
+    }
+  }, [])
   
   // Inicializar con la fecha actual
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())

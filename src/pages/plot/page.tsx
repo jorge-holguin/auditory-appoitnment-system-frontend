@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X, ChevronDown, Search } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X, ChevronDown, Search, Eye } from "lucide-react"
 
 import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/dialog"
 import type { DateValue } from "@internationalized/date"
 import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse, type ErrorDetalle } from "@/services/tramaService"
+import { obtenerCitaIdPorAtencion } from "@/services/citaService"
+import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { format } from "date-fns"
 import { parseDate } from "@internationalized/date"
 
@@ -112,6 +114,13 @@ export default function PlotPage() {
   const [cargandoEnvioPaquete, setCargandoEnvioPaquete] = useState(false)
   const [pageSize, setPageSize] = useState<number>(25)
   const [currentPage, setCurrentPage] = useState<number>(0)
+
+  // Estados para el modal de revisión de FUA
+  const [modalRevisarOpen, setModalRevisarOpen] = useState(false)
+  const [modalCitaId, setModalCitaId] = useState<string>("")
+  const [modalFirmado, setModalFirmado] = useState<boolean>(false)
+  const [modalFua, setModalFua] = useState<Fua | null>(null)
+  const [loadingVerAtencion, setLoadingVerAtencion] = useState<string | null>(null)
 
   // Estados para el dialog de confirmación del paquete
   const [showPackageDialog, setShowPackageDialog] = useState(false)
@@ -383,11 +392,27 @@ export default function PlotPage() {
     setCurrentPage(0)
   }
 
-  // Filtrar FUAs por búsqueda de número de FUA, por estado de firmado y por médico (frontend)
+  // Función para ver FUA en modal de revisión
+  const handleVerAtencion = async (fua: Fua) => {
+    setLoadingVerAtencion(fua.id)
+    try {
+      const citaId = await obtenerCitaIdPorAtencion(fua.id)
+      setModalCitaId(citaId)
+      setModalFirmado(fua.firmado === true)
+      setModalFua(fua)
+      setModalRevisarOpen(true)
+    } catch (error) {
+      console.error("Error al obtener cita ID:", error)
+      alert("No se pudo obtener el ID de cita para esta atención.")
+    } finally {
+      setLoadingVerAtencion(null)
+    }
+  }
+
+  // Filtrar FUAs por búsqueda de ID atención seguro, por estado de firmado y por médico (frontend)
   const fuasFiltradas = fuas.filter(fua => {
-    // Filtro por búsqueda de texto
+    // Filtro por búsqueda de ID atención seguro
     const matchesBusqueda = !busquedaFua.trim() || 
-      fua.numeroFua?.toLowerCase().includes(busquedaFua.toLowerCase()) ||
       fua.id?.toLowerCase().includes(busquedaFua.toLowerCase())
     
     // Filtro por firmado
@@ -564,17 +589,17 @@ export default function PlotPage() {
               />
             </div>
 
-            {/* Fila 3: Buscar FUA - Estado - Botón Generar Paquete */}
+            {/* Fila 3: Buscar ID Atención - Estado - Botón Generar Paquete */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <div>
                 <label className="block text-sm font-medium text-[#114C5F] mb-2">
-                  Buscar por N° FUA
+                  Buscar por ID Atención Seguro
                 </label>
                 <input
                   type="text"
                   value={busquedaFua}
                   onChange={(e) => setBusquedaFua(e.target.value)}
-                  placeholder="Ingrese número de FUA..."
+                  placeholder="Ingrese ID de atención seguro..."
                   className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
                 />
               </div>
@@ -626,7 +651,7 @@ export default function PlotPage() {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° FUA</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">ID Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Médico</th>
@@ -634,23 +659,24 @@ export default function PlotPage() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Firmado</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Cargando FUAs...
                       </td>
                     </tr>
                   ) : fuasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         {especialidad === "todos" 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
                           : busquedaFua.trim()
-                          ? `No se encontraron FUAs con el número "${busquedaFua}"`
+                          ? `No se encontraron atenciones con el ID "${busquedaFua}"`
                           : "No se encontraron FUAs con los filtros seleccionados"}
                       </td>
                     </tr>
@@ -677,7 +703,7 @@ export default function PlotPage() {
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono">{fua.numeroFua || (fua as any).idCuenta || fua.id}</td>
+                      <td className="px-4 py-3 text-sm font-mono">{fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{fua.medico || 'N/A'}</td>
@@ -708,6 +734,21 @@ export default function PlotPage() {
                               <X className="w-4 h-4 text-red-600" />
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Button
+                            size="sm"
+                            onClick={() => handleVerAtencion(fua)}
+                            disabled={loadingVerAtencion === fua.id}
+                            className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white text-xs h-7"
+                          >
+                            {loadingVerAtencion === fua.id ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <Eye className="w-3 h-3 mr-1" />
+                            )}
+                            Ver
+                          </Button>
                         </td>
                       </tr>
                     ))
@@ -952,6 +993,29 @@ export default function PlotPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Revisión de FUA */}
+      {modalFua && (
+        <PdfReviewModal
+          open={modalRevisarOpen}
+          onClose={() => setModalRevisarOpen(false)}
+          citaId={modalCitaId}
+          firmado={modalFirmado}
+          requireRevert
+          citaContext={{
+            paciente: modalFua.paciente || '',
+            fecha: modalFua.fechaAtencion || '',
+            hora: '',
+            consultorioNombre: '',
+            medicoNombre: modalFua.medico || '',
+            seguroNombre: '',
+            historia: modalFua.hc || '',
+            seguro: '',
+            numRef: '',
+            entidadSis: '',
+          }}
+        />
+      )}
     </div>
   )
 }
