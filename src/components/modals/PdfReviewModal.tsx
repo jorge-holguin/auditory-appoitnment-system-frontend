@@ -1,10 +1,9 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, AlertCircle, Loader2, ExternalLink, RotateCcw } from "lucide-react"
+import { CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react"
 import { useState, useEffect } from "react"
 import { RevisionAtencionModal } from "./RevisionAtencionModal"
-import { aprobarCita, revertirCita, marcarEnRevision } from "@/services/citaService"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { aprobarCita } from "@/services/citaService"
 
 interface CitaContext {
   paciente: string
@@ -40,17 +39,6 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
   const [error, setError] = useState<string | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [loadingPdf, setLoadingPdf] = useState(false)
-  const [reverted, setReverted] = useState(false)
-  const [showRevertConfirm, setShowRevertConfirm] = useState(false)
-  const [loadingRevert, setLoadingRevert] = useState(false)
-
-  // Reset reverted state when modal opens/closes
-  useEffect(() => {
-    if (!open) {
-      setReverted(false)
-      setShowRevertConfirm(false)
-    }
-  }, [open])
   
   // URL base para abrir en nueva pestaña (siempre usa la URL directa)
   const externalPdfUrl = firmado 
@@ -142,22 +130,6 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
     onClose()
   }
 
-  const handleRevertir = async () => {
-    setLoadingRevert(true)
-    setError(null)
-    try {
-      await revertirCita(citaId)
-      await marcarEnRevision(citaId)
-      setReverted(true)
-      setShowRevertConfirm(false)
-    } catch (err) {
-      console.error("Error al revertir cita:", err)
-      setError("Error al revertir la cita. Por favor, int\u00e9ntelo de nuevo.")
-    } finally {
-      setLoadingRevert(false)
-    }
-  }
-
   const handleOpenInNewTab = () => {
     window.open(externalPdfUrl, '_blank')
   }
@@ -205,52 +177,36 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
           </div>
         )}
 
-        <div className="flex gap-4 pt-4 border-t">
-          {requireRevert && !reverted ? (
+        {!requireRevert && (
+          <div className="flex gap-4 pt-4 border-t">
             <Button
-              onClick={() => setShowRevertConfirm(true)}
-              disabled={loadingRevert}
+              onClick={handleObservar}
+              disabled={loading || isAprobado || isCompletado}
               variant="outline"
-              className="flex-1 h-12 text-base font-medium border-2 border-[#4A6EB0] text-[#4A6EB0] hover:bg-[#4A6EB0]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 h-12 text-base font-medium border-2 border-orange-500 text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loadingRevert ? (
+              {loading ? (
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               ) : (
-                <RotateCcw className="w-5 h-5 mr-2" />
+                <AlertCircle className="w-5 h-5 mr-2" />
               )}
-              Revertir para Auditar
+              Observar
             </Button>
-          ) : (
-            <>
-              <Button
-                onClick={handleObservar}
-                disabled={loading || isAprobado || isCompletado}
-                variant="outline"
-                className="flex-1 h-12 text-base font-medium border-2 border-orange-500 text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 mr-2" />
-                )}
-                Observar
-              </Button>
-              
-              <Button
-                onClick={handleAprobar}
-                disabled={loading || isAprobado || isObservado || isCompletado}
-                className="flex-1 h-12 text-base font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                )}
-                Aprobar
-              </Button>
-            </>
-          )}
-        </div>
+            
+            <Button
+              onClick={handleAprobar}
+              disabled={loading || isAprobado || isObservado || isCompletado}
+              className="flex-1 h-12 text-base font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-5 h-5 mr-2" />
+              )}
+              Aprobar
+            </Button>
+          </div>
+        )}
       </DialogContent>
 
       {/* Modal de Revisión de Atención */}
@@ -264,35 +220,6 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
         citaEstado={estadoAuditoria}
       />
 
-      {/* Diálogo de confirmación de revertir */}
-      <AlertDialog open={showRevertConfirm} onOpenChange={setShowRevertConfirm}>
-        <AlertDialogContent className="border-[#9CD2D3]/60 shadow-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-semibold text-[#114C5F]">
-              ¿Está seguro de revertir esta atención?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-gray-600">
-              Esta acción revertirá el estado de la atención a PENDIENTE y luego la marcará EN REVISIÓN para que pueda ser auditada. Después podrá observar o aprobar la atención.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-[#9CD2D3] text-[#114C5F] hover:bg-[#9CD2D3]/10">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#4A6EB0] hover:bg-[#3d5d96] text-white shadow-md"
-              onClick={handleRevertir}
-              disabled={loadingRevert}
-            >
-              {loadingRevert ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Revirtiendo...</>
-              ) : (
-                "Sí, revertir"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Dialog>
   )
 }

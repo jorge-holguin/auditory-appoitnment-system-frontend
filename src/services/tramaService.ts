@@ -370,3 +370,41 @@ export async function obtenerEstadosAtencion(fase: number = 1): Promise<EstadoAt
     throw error
   }
 }
+
+/**
+ * Elimina una atención individual del SIS
+ * DELETE /api/v1/conecta-sis/atencion/{fua}
+ */
+export async function eliminarAtencionSis(fua: string): Promise<void> {
+  const url = `${API_INTEROP_URL}/conecta-sis/atencion/${fua}`
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "accept": "*/*"
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error al eliminar atención: ${response.status} ${response.statusText}`)
+  }
+}
+
+/**
+ * Elimina un paquete completo y todas sus atenciones del SIS
+ * DELETE /api/v1/conecta-sis/paquete/{numeroPaquete}/atenciones?usuario={usuario}
+ */
+export async function eliminarPaqueteSis(numeroPaquete: string, usuario: string): Promise<void> {
+  const url = `${API_INTEROP_URL}/conecta-sis/paquete/${numeroPaquete}/atenciones?usuario=${usuario}`
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "accept": "*/*"
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error al eliminar paquete: ${response.status} ${response.statusText}`)
+  }
+}

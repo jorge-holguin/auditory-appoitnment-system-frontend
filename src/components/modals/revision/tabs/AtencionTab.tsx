@@ -48,6 +48,15 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               <p className="text-gray-900 text-base font-medium">{atencion.imc || '-'}</p>
             </div>
           </div>
+
+          <SectionObservation
+            sectionName="OBSERVACION_funciones_vitales"
+            onAddObservation={onAddObservation}
+            hasObservation={hasObservation('OBSERVACION_funciones_vitales')}
+            getObservationText={getObservationText}
+            estado={getObservationEstado?.('OBSERVACION_funciones_vitales')}
+            onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_funciones_vitales') : undefined}
+          />
         </CardContent>
       </Card>
 
@@ -139,10 +148,6 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               <span className="text-sm font-medium text-gray-700">Destino:</span>
               <span className="text-sm text-gray-900 ml-2">{atencion.Destino || 'No especificado'}</span>
             </div>
-            <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Observaciones:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.Observaciones || 'No especificado'}</span>
-            </div>
           </div>
 
           <SectionObservation
@@ -152,6 +157,29 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             getObservationText={getObservationText}
             estado={getObservationEstado?.('OBSERVACION_destino')}
             onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_destino') : undefined}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
+            Observaciones
+          </h3>
+          <div className="space-y-2">
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Observaciones:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.Observaciones || 'No especificado'}</span>
+            </div>
+          </div>
+
+          <SectionObservation
+            sectionName="OBSERVACION_observaciones_destino"
+            onAddObservation={onAddObservation}
+            hasObservation={hasObservation('OBSERVACION_observaciones_destino')}
+            getObservationText={getObservationText}
+            estado={getObservationEstado?.('OBSERVACION_observaciones_destino')}
+            onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_observaciones_destino') : undefined}
           />
         </CardContent>
       </Card>

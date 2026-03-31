@@ -2,9 +2,12 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye } from "lucide-react"
+import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, Trash2 } from "lucide-react"
 import { obtenerCitaIdPorAtencion } from "@/services/citaService"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
+import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { extractDocumentFromToken } from "@/utils/jwtUtils"
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import {
@@ -113,6 +116,17 @@ export default function PackagesPage() {
   const [loadingVerificacion, setLoadingVerificacion] = useState(false)
   const [mostrarVerificacion, setMostrarVerificacion] = useState(false)
   const [errorVerificacion, setErrorVerificacion] = useState<string | null>(null)
+
+  // Estados para eliminar paquete
+  const [showDeletePaqueteDialog, setShowDeletePaqueteDialog] = useState(false)
+  const [paqueteAEliminar, setPaqueteAEliminar] = useState<Paquete | null>(null)
+  const [loadingDeletePaquete, setLoadingDeletePaquete] = useState(false)
+
+  // Estados para eliminar atención individual
+  const [showDeleteAtencionDialog, setShowDeleteAtencionDialog] = useState(false)
+  const [atencionAEliminar, setAtencionAEliminar] = useState<DetallePaquete | null>(null)
+  const [loadingDeleteAtencion, setLoadingDeleteAtencion] = useState(false)
+
   const tamanio = 10
 
   const API_INTEROP_URL = import.meta.env.VITE_API_INTEROP_URL
@@ -243,6 +257,51 @@ export default function PackagesPage() {
     fetchPaquetes()
   }
 
+  // Eliminar paquete completo
+  const handleConfirmDeletePaquete = async () => {
+    if (!paqueteAEliminar) return
+    const usuario = extractDocumentFromToken()
+    if (!usuario) {
+      alert("No se pudo obtener el usuario actual. Por favor, inicie sesión nuevamente.")
+      return
+    }
+    setLoadingDeletePaquete(true)
+    try {
+      await eliminarPaqueteSis(paqueteAEliminar.codigoPaqueteSis, usuario)
+      setShowDeletePaqueteDialog(false)
+      setPaqueteAEliminar(null)
+      if (paqueteSeleccionado?.idPaqueteSis === paqueteAEliminar.idPaqueteSis) {
+        setPaqueteSeleccionado(null)
+        setDetallesPaquete([])
+      }
+      fetchPaquetes()
+    } catch (err) {
+      console.error("Error al eliminar paquete:", err)
+      alert("Error al eliminar el paquete. Por favor, inténtelo de nuevo.")
+    } finally {
+      setLoadingDeletePaquete(false)
+    }
+  }
+
+  // Eliminar atención individual
+  const handleConfirmDeleteAtencion = async () => {
+    if (!atencionAEliminar) return
+    setLoadingDeleteAtencion(true)
+    try {
+      await eliminarAtencionSis(atencionAEliminar.idAtencion)
+      setShowDeleteAtencionDialog(false)
+      setAtencionAEliminar(null)
+      if (paqueteSeleccionado) {
+        fetchDetallesPaquete(paqueteSeleccionado.idPaqueteSis)
+      }
+    } catch (err) {
+      console.error("Error al eliminar atención:", err)
+      alert("Error al eliminar la atención. Por favor, inténtelo de nuevo.")
+    } finally {
+      setLoadingDeleteAtencion(false)
+    }
+  }
+
   const handleLimpiarFiltros = () => {
     setEstado("todos")
     setNumeroPaquete("")
@@ -322,18 +381,19 @@ export default function PackagesPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Inicio</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Fin</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                             Cargando paquetes...
                           </td>
                         </tr>
                       ) : paquetes.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                             No se encontraron paquetes
                           </td>
                         </tr>
@@ -363,6 +423,21 @@ export default function PackagesPage() {
                             <td className="px-4 py-3 text-sm">{paquete.fechaInicio}</td>
                             <td className="px-4 py-3 text-sm">{paquete.fechaFin}</td>
                             <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
+                            <td className="px-4 py-3 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setPaqueteAEliminar(paquete)
+                                  setShowDeletePaqueteDialog(true)
+                                }}
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                title="Eliminar paquete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -490,19 +565,37 @@ export default function PackagesPage() {
                                 )}
                               </td>
                               <td className="px-4 py-2 text-center">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleVerAtencion(detalle)}
-                                  disabled={loadingVerAtencion === detalle.idAtencion}
-                                  className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white text-xs h-6 px-2"
-                                >
-                                  {loadingVerAtencion === detalle.idAtencion ? (
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                  ) : (
-                                    <Eye className="w-3 h-3 mr-1" />
-                                  )}
-                                  Ver
-                                </Button>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleVerAtencion(detalle)}
+                                    disabled={loadingVerAtencion === detalle.idAtencion}
+                                    className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white text-xs h-6 px-2"
+                                  >
+                                    {loadingVerAtencion === detalle.idAtencion ? (
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <Eye className="w-3 h-3 mr-1" />
+                                    )}
+                                    Ver
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setAtencionAEliminar(detalle)
+                                      setShowDeleteAtencionDialog(true)
+                                    }}
+                                    disabled={loadingDeleteAtencion && atencionAEliminar?.id === detalle.id}
+                                    className="bg-red-600 hover:bg-red-700 text-white text-xs h-6 px-2"
+                                  >
+                                    {loadingDeleteAtencion && atencionAEliminar?.id === detalle.id ? (
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                    )}
+                                    Eliminar
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -706,6 +799,68 @@ export default function PackagesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmación para eliminar paquete */}
+      <AlertDialog open={showDeletePaqueteDialog} onOpenChange={setShowDeletePaqueteDialog}>
+        <AlertDialogContent className="border-red-200 shadow-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-semibold text-red-700 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              ¿Está seguro de eliminar este paquete?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-600">
+              Se eliminará el paquete <strong>{paqueteAEliminar?.codigoPaqueteSis}</strong> y todas las atenciones que contiene. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white shadow-md"
+              onClick={handleConfirmDeletePaquete}
+              disabled={loadingDeletePaquete}
+            >
+              {loadingDeletePaquete ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Eliminando...</>
+              ) : (
+                "Sí, eliminar paquete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de confirmación para eliminar atención */}
+      <AlertDialog open={showDeleteAtencionDialog} onOpenChange={setShowDeleteAtencionDialog}>
+        <AlertDialogContent className="border-red-200 shadow-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-semibold text-red-700 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              ¿Está seguro de eliminar esta atención?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-600">
+              Se eliminará la atención <strong>{atencionAEliminar?.idAtencion}</strong> (FUA: {atencionAEliminar?.numeroFua}) del SIS. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white shadow-md"
+              onClick={handleConfirmDeleteAtencion}
+              disabled={loadingDeleteAtencion}
+            >
+              {loadingDeleteAtencion ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Eliminando...</>
+              ) : (
+                "Sí, eliminar atención"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de Revisión de FUA */}
       {modalDetalle && (

@@ -29,7 +29,8 @@ export const SECCION_IDS = {
   OBSERVACION_laboratorio: 6,
   OBSERVACION_rayosx: 7,
   OBSERVACION_ecografia: 8,
-  OBSERVACION_procedimientos: 9
+  OBSERVACION_procedimientos: 9,
+  OBSERVACION_observaciones_destino: 10
 } as const
 
 /**
