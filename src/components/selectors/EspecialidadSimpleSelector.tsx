@@ -59,13 +59,10 @@ export function EspecialidadSimpleSelector({
     fetchEspecialidades()
   }, [])
 
-  const options: ComboboxOption[] = [
-    { value: "todos", label: "TODOS" },
-    ...especialidades.map(esp => ({
-      value: esp.idEspecialidadSgh,
-      label: esp.descripcion
-    }))
-  ]
+  const options: ComboboxOption[] = especialidades.map(esp => ({
+    value: esp.idEspecialidadSgh,
+    label: esp.descripcion
+  }))
 
   return (
     <ComboboxSelect

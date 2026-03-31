@@ -545,3 +545,43 @@ export async function obtenerCitaIdPorAtencion(idAtencionSeguro: string): Promis
     throw error
   }
 }
+
+/**
+ * Elimina firmas de documentos observados por auditoría
+ * POST /ConsultaExterna/deleteObservados
+ */
+export async function deleteObservados(
+  citaId: string,
+  observacion: string,
+  usuarioElimina: string
+): Promise<void> {
+  const API_CONSULTA_EXTERNA_URL = import.meta.env.VITE_CONSULTA_EXTERNA_URL
+  const url = `${API_CONSULTA_EXTERNA_URL}/deleteObservados`
+
+  const requestBody = {
+    documentos: [
+      { idDocumento: citaId, idTipoDocumento: 9 },   // Atención
+      { idDocumento: citaId, idTipoDocumento: 10 }  // FUA
+    ],
+    observacion,
+    usuarioElimina
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al eliminar observados: ${response.status} ${response.statusText}`)
+    }
+  } catch (error) {
+    console.error("Error en deleteObservados:", error)
+    throw error
+  }
+}

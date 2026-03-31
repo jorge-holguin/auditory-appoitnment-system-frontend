@@ -381,7 +381,9 @@ export default function PackagesPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Inicio</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Fin</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                        {/* Acciones columna comentada - delete deshabilitado
                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
+                        */}
                       </tr>
                     </thead>
                     <tbody>
@@ -423,6 +425,7 @@ export default function PackagesPage() {
                             <td className="px-4 py-3 text-sm">{paquete.fechaInicio}</td>
                             <td className="px-4 py-3 text-sm">{paquete.fechaFin}</td>
                             <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
+                            {/* Botón eliminar paquete comentado
                             <td className="px-4 py-3 text-center">
                               <Button
                                 size="sm"
@@ -438,6 +441,7 @@ export default function PackagesPage() {
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
+                            */}
                           </tr>
                         ))
                       )}
@@ -579,6 +583,7 @@ export default function PackagesPage() {
                                     )}
                                     Ver
                                   </Button>
+                                  {/* Botón eliminar atención comentado
                                   <Button
                                     size="sm"
                                     onClick={() => {
@@ -595,6 +600,7 @@ export default function PackagesPage() {
                                     )}
                                     Eliminar
                                   </Button>
+                                  */}
                                 </div>
                               </td>
                             </tr>

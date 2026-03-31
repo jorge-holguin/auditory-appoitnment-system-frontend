@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import PatientSidebar from "./revision/PatientSidebar"
 import { LiquidacionesModal } from "./revision/LiquidacionesModal"
 import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection, GetObservationEstado, DeleteObservation } from "./revision/types"
-import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita, aprobarCita } from "@/services/citaService"
+import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita, aprobarCita, deleteObservados } from "@/services/citaService"
 import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, anularObservacion, SECCION_IDS } from "@/services/observacionService"
 import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
@@ -361,6 +361,18 @@ export function RevisionAtencionModal({
 
   const handleConfirmSave = async () => {
     try {
+      // Eliminar firmas de documentos observados
+      const usuario = extractDocumentFromToken()
+      if (usuario) {
+        try {
+          await deleteObservados(citaId, "firma anulada por observacion del auditor", usuario)
+          console.log("✅ Firmas de documentos eliminadas correctamente")
+        } catch (err) {
+          console.error("Error al eliminar firmas:", err)
+          // No bloqueamos el flujo si falla la eliminación de firmas
+        }
+      }
+
       // Cambiar el estado de la cita a OBSERVADO (4)
       await observarCita(citaId)
       
