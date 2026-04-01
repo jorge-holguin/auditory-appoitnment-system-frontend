@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react"
+import { CheckCircle, AlertCircle, Loader2, ExternalLink, FileSearch } from "lucide-react"
 import { useState, useEffect } from "react"
 import { RevisionAtencionModal } from "./RevisionAtencionModal"
 import { aprobarCita } from "@/services/citaService"
@@ -36,6 +36,7 @@ const API_CONSULTA_EXTERNA_URL = import.meta.env.VITE_CONSULTA_EXTERNA_URL
 export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAuditoria, firmado, onAprobar, onRefresh, requireRevert = false }: PdfReviewModalProps) {
   const [loading, setLoading] = useState(false)
   const [showRevisionModal, setShowRevisionModal] = useState(false)
+  const [showRevisionReadOnly, setShowRevisionReadOnly] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [loadingPdf, setLoadingPdf] = useState(false)
@@ -177,6 +178,19 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
           </div>
         )}
 
+        {requireRevert && (
+          <div className="flex gap-4 pt-4 border-t">
+            <Button
+              onClick={() => setShowRevisionReadOnly(true)}
+              variant="outline"
+              className="flex-1 h-12 text-base font-medium border-2 border-[#4F9BB6] text-[#4F9BB6] hover:bg-[#4F9BB6]/10"
+            >
+              <FileSearch className="w-5 h-5 mr-2" />
+              Ver Atención
+            </Button>
+          </div>
+        )}
+
         {!requireRevert && (
           <div className="flex gap-4 pt-4 border-t">
             <Button
@@ -218,6 +232,16 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
         onSave={handleSaveObservations}
         onRefresh={onRefresh}
         citaEstado={estadoAuditoria}
+      />
+
+      {/* Modal de Consulta de Atención (solo lectura) */}
+      <RevisionAtencionModal
+        open={showRevisionReadOnly}
+        onClose={() => setShowRevisionReadOnly(false)}
+        citaId={citaId}
+        citaContext={citaContext}
+        citaEstado={estadoAuditoria}
+        readOnly
       />
 
     </Dialog>

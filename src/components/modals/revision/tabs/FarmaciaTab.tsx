@@ -39,9 +39,10 @@ interface Props {
   getObservationText: (fieldName: string) => string
   getObservationEstado?: GetObservationEstado
   onDeleteObservation?: DeleteObservation
+  readOnly?: boolean
 }
 
-export default function FarmaciaTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
+export default function FarmaciaTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation, readOnly }: Props) {
   return (
     <div className="space-y-4 pr-2">
       <Card className="shadow-sm border-l-4 border-l-purple-500">
@@ -132,6 +133,7 @@ export default function FarmaciaTab({ atencion, onAddObservation, hasObservation
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_farmacia')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_farmacia') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>

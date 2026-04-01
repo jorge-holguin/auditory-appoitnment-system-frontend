@@ -48,9 +48,13 @@ interface SectionObservationProps {
   getObservationText: (fieldName: string) => string
   estado?: string // 0=anulada, 1=activa, 2=subsanada
   onDelete?: () => void
+  readOnly?: boolean
 }
 
-export const SectionObservation = ({ sectionName, onAddObservation, hasObservation, getObservationText, estado, onDelete }: SectionObservationProps) => {
+export const SectionObservation = ({ sectionName, onAddObservation, hasObservation, getObservationText, estado, onDelete, readOnly }: SectionObservationProps) => {
+  // En modo solo lectura, no mostrar el bloque de observaciones
+  if (readOnly) return null
+
   const [open, setOpen] = useState(false)
   const [observationText, setObservationText] = useState('')
 

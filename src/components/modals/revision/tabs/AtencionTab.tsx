@@ -10,9 +10,10 @@ interface Props {
   getObservationText: (fieldName: string) => string
   getObservationEstado?: GetObservationEstado
   onDeleteObservation?: DeleteObservation
+  readOnly?: boolean
 }
 
-export default function AtencionTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
+export default function AtencionTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation, readOnly }: Props) {
   return (
     <div className="space-y-4 pr-2">
 
@@ -56,6 +57,7 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             getObservationText={getObservationText}
             estado={getObservationEstado?.('OBSERVACION_funciones_vitales')}
             onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_funciones_vitales') : undefined}
+            readOnly={readOnly}
           />
         </CardContent>
       </Card>
@@ -133,6 +135,7 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             getObservationText={getObservationText}
             estado={getObservationEstado?.('OBSERVACION_Atención_Principal_Motivo_Antecedentes')}
             onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_Atención_Principal_Motivo_Antecedentes') : undefined}
+            readOnly={readOnly}
           />
         </CardContent>
       </Card>
@@ -157,6 +160,7 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             getObservationText={getObservationText}
             estado={getObservationEstado?.('OBSERVACION_destino')}
             onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_destino') : undefined}
+            readOnly={readOnly}
           />
         </CardContent>
       </Card>
@@ -180,6 +184,7 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
             getObservationText={getObservationText}
             estado={getObservationEstado?.('OBSERVACION_observaciones_destino')}
             onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_observaciones_destino') : undefined}
+            readOnly={readOnly}
           />
         </CardContent>
       </Card>

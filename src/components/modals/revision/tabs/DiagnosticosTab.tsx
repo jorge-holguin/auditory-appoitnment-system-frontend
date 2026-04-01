@@ -13,9 +13,10 @@ interface Props {
   getTipoDxBadge: (tipo: string) => { label: string; className: string }
   getObservationEstado?: GetObservationEstado
   onDeleteObservation?: DeleteObservation
+  readOnly?: boolean
 }
 
-export default function DiagnosticosTab({ atencion, onAddObservation, hasObservation, getObservationText, getTipoDxBadge, getObservationEstado, onDeleteObservation }: Props) {
+export default function DiagnosticosTab({ atencion, onAddObservation, hasObservation, getObservationText, getTipoDxBadge, getObservationEstado, onDeleteObservation, readOnly }: Props) {
   return (
     <div className="space-y-4 pr-2">
       <Card className="shadow-sm border-l-4 border-l-indigo-500">
@@ -75,6 +76,7 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_diagnosticos')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_diagnosticos') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>
@@ -146,6 +148,7 @@ export default function DiagnosticosTab({ atencion, onAddObservation, hasObserva
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_procedimientos')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_procedimientos') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>

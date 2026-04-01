@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import PatientSidebar from "./revision/PatientSidebar"
 import { LiquidacionesModal } from "./revision/LiquidacionesModal"
 import type { AtencionData, FieldObservation, HasObservation, AddObservation, TabSection, GetObservationEstado, DeleteObservation } from "./revision/types"
-import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita, aprobarCita, deleteObservados } from "@/services/citaService"
+import { obtenerAtencionCompleta, obtenerPacienteConFoto, observarCita, aprobarCita, deleteObservados, buscarCitaPorId } from "@/services/citaService"
 import { obtenerObservacionesPorCita, crearObservacion, editarObservacion, anularObservacion, SECCION_IDS } from "@/services/observacionService"
 import { extractDocumentFromToken } from "@/utils/jwtUtils"
 
@@ -48,6 +48,7 @@ interface RevisionAtencionModalProps {
   onSave?: (observations: FieldObservation[]) => void
   onRefresh?: () => void
   citaEstado?: string
+  readOnly?: boolean
 }
 
 export function RevisionAtencionModal({
@@ -57,7 +58,8 @@ export function RevisionAtencionModal({
   citaContext,
   onSave,
   onRefresh,
-  citaEstado = '1' // Default to PENDIENTE if not provided
+  citaEstado = '1', // Default to PENDIENTE if not provided
+  readOnly = false
 }: RevisionAtencionModalProps) {
   const [observations, setObservations] = useState<FieldObservation[]>([])
   const [activeTab, setActiveTab] = useState<TabSection>("atencion")
@@ -67,6 +69,7 @@ export function RevisionAtencionModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [resolvedCitaContext, setResolvedCitaContext] = useState<CitaContext>(citaContext)
 
   // -------------------------------
   // Cargar datos al abrir modal
@@ -92,8 +95,38 @@ export function RevisionAtencionModal({
     setError(null)
 
     try {
-      const codigoPaciente = citaContext.paciente
-      if (!codigoPaciente) throw new Error("No se encontró el código de paciente en el contexto de la cita")
+      // Primero cargar la atención completa para obtener el código del paciente
+      const dataAtencion = await obtenerAtencionCompleta(citaId)
+
+      // Obtener datos completos de la cita y complementar campos faltantes del citaContext
+      let citaData = { ...citaContext }
+      try {
+        const cita = await buscarCitaPorId(citaId)
+        citaData = {
+          paciente: citaContext.paciente || cita.paciente || '',
+          fecha: citaContext.fecha || cita.fecha || '',
+          hora: citaContext.hora || cita.hora || '',
+          consultorioNombre: citaContext.consultorioNombre || cita.consultorioNombre || '',
+          medicoNombre: citaContext.medicoNombre || cita.medicoNombre || '',
+          seguroNombre: citaContext.seguroNombre || cita.seguroNombre || '',
+          historia: citaContext.historia || cita.historia?.trim() || '',
+          seguro: citaContext.seguro || cita.seguro?.trim() || '',
+          numRef: citaContext.numRef || cita.numRef?.trim() || '',
+          entidadSis: citaContext.entidadSis || cita.entidadSis?.trim() || ''
+        }
+      } catch (err) {
+        console.warn("⚠️ No se pudo obtener datos de la cita:", err)
+      }
+      
+      // Guardar el contexto resuelto para PatientSidebar
+      setResolvedCitaContext(citaData)
+
+      // Extraer el código del paciente de la atención (puede estar en diferentes campos)
+      const codigoPaciente = citaData.paciente || dataAtencion.atencionc?.paciente || dataAtencion.paciente || dataAtencion.atencionc?.codpaciente || dataAtencion.atencionc?.codPaciente
+      
+      if (!codigoPaciente) {
+        throw new Error("No se pudo determinar el código del paciente. Contexto vacío y atención sin código de paciente.")
+      }
 
       const dataPaciente = await obtenerPacienteConFoto(codigoPaciente)
       setPatient({
@@ -139,10 +172,9 @@ export function RevisionAtencionModal({
 
       setObservations(observacionesMapeadas)
 
-      const data = await obtenerAtencionCompleta(citaId)
-
-      const pesoNum = Number(data.atencionc?.peso) || 0
-      const tallaNumCm = Number(data.atencionc?.talla) || 0
+      // Usar dataAtencion obtenido al inicio de la función
+      const pesoNum = Number(dataAtencion.atencionc?.peso) || 0
+      const tallaNumCm = Number(dataAtencion.atencionc?.talla) || 0
       let imcCalculado = "0"
 
       if (pesoNum > 0 && tallaNumCm > 0) {
@@ -155,29 +187,29 @@ export function RevisionAtencionModal({
 
       const atencionData: AtencionData = {
         // Info básica
-        fechaAtencion: formatearFecha(citaContext.fecha),
-        horaAtencion: citaContext.hora,
-        consultorio: citaContext.consultorioNombre,
-        profesional: citaContext.medicoNombre,
-        temperatura: data.atencionc?.tempe?.toString() || "0",
-        presionArterial: data.atencionc?.presion || "0/0",
-        frecuenciaCardiaca: data.atencionc?.fc?.toString() || "0",
+        fechaAtencion: citaData.fecha ? formatearFecha(citaData.fecha) : formatearFecha(dataAtencion.atencionc?.fecha || ''),
+        horaAtencion: citaData.hora || dataAtencion.atencionc?.horaAten || '',
+        consultorio: citaData.consultorioNombre || dataAtencion.atencionc?.consultorioNombre || '',
+        profesional: citaData.medicoNombre || dataAtencion.atencionc?.profAtencion || '',
+        temperatura: dataAtencion.atencionc?.tempe?.toString() || "0",
+        presionArterial: dataAtencion.atencionc?.presion || "0/0",
+        frecuenciaCardiaca: dataAtencion.atencionc?.fc?.toString() || "0",
         peso: pesoNum ? pesoNum.toString() : "0",
         talla: tallaNumCm ? tallaNumCm.toString() : "0",
         imc: imcCalculado,
 
         // Bloque atención
-        Motivo: data.atencionc?.motivo || "",
-        TiempoEnfermedad: data.atencionc?.tiempoEnf || "",
-        Antecedente: data.atencionc?.antecedente || "",
-        RelatoAnamnesis: data.atencionc?.ananmesis || "",
-        ExamenFisico: data.atencionc?.examenFisico || "",
-        Apetito: data.atencionc?.apetito || "Conservado",
-        Sed: data.atencionc?.sed || "Conservado",
-        Sueño: data.atencionc?.sueno || "Conservado",
-        EstadoAnimo: data.atencionc?.animo || "Conservado",
-        Orina: data.atencionc?.orina || "Conservado",
-        Deposiciones: data.atencionc?.deposiciones || "Conservado",
+        Motivo: dataAtencion.atencionc?.motivo || "",
+        TiempoEnfermedad: dataAtencion.atencionc?.tiempoEnf || "",
+        Antecedente: dataAtencion.atencionc?.antecedente || "",
+        RelatoAnamnesis: dataAtencion.atencionc?.ananmesis || "",
+        ExamenFisico: dataAtencion.atencionc?.examenFisico || "",
+        Apetito: dataAtencion.atencionc?.apetito || "Conservado",
+        Sed: dataAtencion.atencionc?.sed || "Conservado",
+        Sueño: dataAtencion.atencionc?.sueno || "Conservado",
+        EstadoAnimo: dataAtencion.atencionc?.animo || "Conservado",
+        Orina: dataAtencion.atencionc?.orina || "Conservado",
+        Deposiciones: dataAtencion.atencionc?.deposiciones || "Conservado",
 
         // Diagnósticos
         DiagnosticoPrincipal: "",
@@ -188,30 +220,30 @@ export function RevisionAtencionModal({
         CodigoCIE_Secundario: "",
 
         // Plan terapéutico
-        PlanTerapeutico: data.atencionc?.planTerapeutico || "",
+        PlanTerapeutico: dataAtencion.atencionc?.planTerapeutico || "",
         ProximaCita: "",
-        Destino: data.atencionc?.destino || "",
-        Observaciones: data.atencionc?.observacion || "",
+        Destino: dataAtencion.atencionc?.destino || "",
+        Observaciones: dataAtencion.atencionc?.observacion || "",
 
         // Apoyo diagnóstico
         Laboratorio_Diagnostico: "",
         Laboratorio_NombreExamen: "",
-        ListadoExamenesLaboratorio: data.laboratorio || [],
+        ListadoExamenesLaboratorio: dataAtencion.laboratorio || [],
         RayosX_Diagnostico: "",
         RayosX_NombreExamen: "",
         RayosX_Zona: "",
-        ListadoExamenesRayosX: data.rayos || [],
+        ListadoExamenesRayosX: dataAtencion.rayos || [],
         Ecografia_Diagnostico: "",
         Ecografia_Lugar: "",
         Ecografia_NombreExamen: "",
         Ecografia_Observacion: "",
-        ListadoExamenesEcografia: data.ecografia || [],
+        ListadoExamenesEcografia: dataAtencion.ecografia || [],
 
         // Farmacia
         Farmacia_Diagnostico: "",
         Farmacia_NombreFarmaco: "",
         Farmacia_IndicacionesGenerales: "",
-        ListadoFarmacos: (data.receta || []).map((r: any) => ({
+        ListadoFarmacos: (dataAtencion.receta || []).map((r: any) => ({
           Nombre: r.nombre || "",
           Cantidad: r.cantidad?.toString() || "",
           Dosis: r.dosis || "",
@@ -245,8 +277,8 @@ export function RevisionAtencionModal({
         Liquidacion_TotalPagar: "",
 
         // Diagnósticos y procedimientos
-        ListadoDiagnosticos: data.diagnosticos || [],
-        ListadoProcedimientos: data.procedimientos || []
+        ListadoDiagnosticos: dataAtencion.diagnosticos || [],
+        ListadoProcedimientos: dataAtencion.procedimientos || []
       }
 
       setAtencion(atencionData)
@@ -502,7 +534,7 @@ export function RevisionAtencionModal({
                   Volver
                 </Button>
                 <DialogTitle className="text-2xl font-semibold text-white flex items-center gap-3">
-                  Revisión de Atención Médica
+                  {readOnly ? 'Consulta de Atención Médica' : 'Revisión de Atención Médica'}
                   {/* Etiqueta de estado de auditoría */}
                   {citaEstado && (
                     <span className={`text-sm px-3 py-1 rounded-full font-medium ${
@@ -534,7 +566,7 @@ export function RevisionAtencionModal({
 
           {/* BODY */}
           <div className="flex-1 min-h-0 overflow-hidden flex gap-4 p-6">
-            <PatientSidebar patient={patient} citaContext={citaContext} atencion={atencion} />
+            <PatientSidebar patient={patient} citaContext={resolvedCitaContext} atencion={atencion} />
 
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabSection)} className="flex-1 min-h-0 flex flex-col">
@@ -555,66 +587,76 @@ export function RevisionAtencionModal({
 
                 <TabsContent value="atencion" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
                   <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>}>
-                    <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                    <AtencionTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} readOnly={readOnly} />
                   </Suspense>
                 </TabsContent>
 
                 <TabsContent value="diagnosticos" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
                   <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>}>
-                    <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                    <DiagnosticosTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getTipoDxBadge={getTipoDxBadge} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} readOnly={readOnly} />
                   </Suspense>
                 </TabsContent>
 
                 <TabsContent value="apoyo" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
                   <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-green-500" /></div>}>
-                    <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                    <ApoyoDiagnosticoTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} readOnly={readOnly} />
                   </Suspense>
                 </TabsContent>
 
                 <TabsContent value="farmacia" className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
                   <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-purple-500" /></div>}>
-                    <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} />
+                    <FarmaciaTab atencion={atencion} onAddObservation={handleAddObservation} hasObservation={hasObservation} getObservationText={getObservationText} getObservationEstado={getObservationEstado} onDeleteObservation={handleDeleteObservationByField} readOnly={readOnly} />
                   </Suspense>
                 </TabsContent>
               </Tabs>
 
               {/* FOOTER */}
-              <div className="border-t mt-4 pt-4 bg-gray-50 px-4 py-3 rounded-b-lg">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    <span className="font-semibold">{observacionesActivas.length}</span> observación(es) activa(s)
-                    {observacionesSubsanadas.length > 0 && (
-                      <span className="ml-2 text-red-600">| {observacionesSubsanadas.length} subsanada(s)</span>
-                    )}
-                  </div>
-                  <div className="flex gap-3">
+              {readOnly ? (
+                <div className="border-t mt-4 pt-4 bg-gray-50 px-4 py-3 rounded-b-lg">
+                  <div className="flex items-center justify-end">
                     <Button variant="outline" onClick={onClose} className="border-gray-300">
-                      Cancelar
-                    </Button>
-                    
-                    {/* Botón Aprobar - visible cuando no hay observaciones activas y la cita está en estado SUBSANADO o EN_REVISION */}
-                    {observacionesActivas.length === 0 && (citaEstado === 'SUBSANADO' || citaEstado === 'EN_REVISION') && (
-                      <Button
-                        onClick={handleApprove}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Aprobar
-                      </Button>
-                    )}
-                    
-                    {/* Botón Guardar Observaciones - siempre visible */}
-                    <Button
-                      onClick={handleSaveAll}
-                      className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
-                      disabled={observacionesActivas.length === 0}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Guardar Observaciones ({observacionesActivas.length})
+                      Cerrar
                     </Button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="border-t mt-4 pt-4 bg-gray-50 px-4 py-3 rounded-b-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      <span className="font-semibold">{observacionesActivas.length}</span> observación(es) activa(s)
+                      {observacionesSubsanadas.length > 0 && (
+                        <span className="ml-2 text-red-600">| {observacionesSubsanadas.length} subsanada(s)</span>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={onClose} className="border-gray-300">
+                        Cancelar
+                      </Button>
+                      
+                      {/* Botón Aprobar - visible cuando no hay observaciones activas y la cita está en estado SUBSANADO o EN_REVISION */}
+                      {observacionesActivas.length === 0 && (citaEstado === 'SUBSANADO' || citaEstado === 'EN_REVISION') && (
+                        <Button
+                          onClick={handleApprove}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Aprobar
+                        </Button>
+                      )}
+                      
+                      {/* Botón Guardar Observaciones - siempre visible */}
+                      <Button
+                        onClick={handleSaveAll}
+                        className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
+                        disabled={observacionesActivas.length === 0}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar Observaciones ({observacionesActivas.length})
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

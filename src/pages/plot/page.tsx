@@ -216,13 +216,6 @@ export default function PlotPage() {
       return
     }
 
-    // No cargar si no hay especialidad seleccionada
-    if (especialidad === "todos") {
-      setFuas([])
-      setCurrentPage(0)
-      return
-    }
-
     setLoading(true)
     try {
       // Convertir DateValue a Date y formatear

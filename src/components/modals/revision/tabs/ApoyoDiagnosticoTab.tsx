@@ -11,9 +11,10 @@ interface Props {
   getObservationText: (fieldName: string) => string
   getObservationEstado?: GetObservationEstado
   onDeleteObservation?: DeleteObservation
+  readOnly?: boolean
 }
 
-export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation }: Props) {
+export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObservation, getObservationText, getObservationEstado, onDeleteObservation, readOnly }: Props) {
   return (
     <div className="space-y-4 pr-2">
       {/* Laboratorio */}
@@ -68,6 +69,7 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_laboratorio')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_laboratorio') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>
@@ -126,6 +128,7 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_rayosx')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_rayosx') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>
@@ -179,6 +182,7 @@ export default function ApoyoDiagnosticoTab({ atencion, onAddObservation, hasObs
               getObservationText={getObservationText}
               estado={getObservationEstado?.('OBSERVACION_ecografia')}
               onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_ecografia') : undefined}
+              readOnly={readOnly}
             />
           </div>
         </CardContent>

@@ -516,6 +516,7 @@ export default function PackagesPage() {
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">ID Atención</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">N° FUA</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Fecha Creación</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Estado del FUA</th>
                           <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observaciones</th>
                           <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700">Acciones</th>
@@ -524,13 +525,13 @@ export default function PackagesPage() {
                       <tbody>
                         {loadingDetalles ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-xs">
+                            <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-xs">
                               Cargando detalles...
                             </td>
                           </tr>
                         ) : detallesPaquete.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-xs">
+                            <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-xs">
                               No hay detalles disponibles
                             </td>
                           </tr>
@@ -539,6 +540,11 @@ export default function PackagesPage() {
                             <tr key={detalle.id} className="border-b hover:bg-gray-50">
                               <td className="px-4 py-2 text-xs font-mono">{detalle.idAtencion}</td>
                               <td className="px-4 py-2 text-xs">{detalle.numeroFua}</td>
+                              <td className="px-4 py-2 text-xs">
+                                {detalle.fechaCreacion 
+                                  ? new Date(detalle.fechaCreacion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                  : '-'}
+                              </td>
                               <td className="px-4 py-2 text-xs">
                                 <span
                                   className={`px-2 py-1 rounded text-xs font-semibold ${
