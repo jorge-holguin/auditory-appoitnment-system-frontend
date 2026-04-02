@@ -378,8 +378,7 @@ export default function PackagesPage() {
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado del Paquete</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Inicio</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Fin</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
                         {/* Acciones columna comentada - delete deshabilitado
                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
@@ -389,13 +388,13 @@ export default function PackagesPage() {
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                             Cargando paquetes...
                           </td>
                         </tr>
                       ) : paquetes.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                             No se encontraron paquetes
                           </td>
                         </tr>
@@ -423,7 +422,6 @@ export default function PackagesPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm">{paquete.fechaInicio}</td>
-                            <td className="px-4 py-3 text-sm">{paquete.fechaFin}</td>
                             <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
                             {/* Botón eliminar paquete comentado
                             <td className="px-4 py-3 text-center">
