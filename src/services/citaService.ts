@@ -102,7 +102,7 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
   const {
     desde,
     hasta,
-    especialidad = "0019",
+    especialidad = "1091",
     medico,
     turnoConsulta,
     estadoAuditoria,
@@ -117,8 +117,8 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
 
   // Agregar ceros al inicio de la especialidad si es necesario
   const especialidadFormatted = especialidad && especialidad !== "todos" 
-    ? especialidad.padStart(4, "0") 
-    : "0019"
+    ? especialidad.padStart(4, "0")
+    : "1091"
 
   // Construir URL con parámetros
   // Siempre usar estado=4 (Atendido) para obtener citas que ya fueron atendidas
