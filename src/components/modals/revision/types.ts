@@ -109,6 +109,7 @@ export interface AtencionData {
   EstadoAnimo: string
   Orina: string
   Deposiciones: string
+  SaludMaterna: string
 
   // Diagnósticos principales/secundarios (resumen)
   DiagnosticoPrincipal: string

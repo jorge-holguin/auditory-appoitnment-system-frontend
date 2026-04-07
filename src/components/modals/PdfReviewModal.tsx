@@ -194,6 +194,15 @@ export function PdfReviewModal({ open, onClose, citaId, citaContext, estadoAudit
         {!requireRevert && (
           <div className="flex gap-4 pt-4 border-t">
             <Button
+              onClick={() => setShowRevisionReadOnly(true)}
+              variant="outline"
+              className="flex-1 h-12 text-base font-medium border-2 border-[#4F9BB6] text-[#4F9BB6] hover:bg-[#4F9BB6]/10"
+            >
+              <FileSearch className="w-5 h-5 mr-2" />
+              Ver Atención
+            </Button>
+            
+            <Button
               onClick={handleObservar}
               disabled={loading || isAprobado || isCompletado}
               variant="outline"

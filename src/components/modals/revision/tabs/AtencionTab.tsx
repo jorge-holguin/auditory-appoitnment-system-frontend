@@ -123,8 +123,8 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
               <span className="text-sm text-gray-900 ml-2">{atencion.Deposiciones || 'No especificado'}</span>
             </div>
             <div className="p-2 rounded">
-              <span className="text-sm font-medium text-gray-700">Plan Terapéutico:</span>
-              <span className="text-sm text-gray-900 ml-2">{atencion.PlanTerapeutico || 'No especificado'}</span>
+              <span className="text-sm font-medium text-gray-700">Salud Materna:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.SaludMaterna || 'NO APLICA'}</span>
             </div>
           </div>
 
@@ -140,6 +140,29 @@ export default function AtencionTab({ atencion, onAddObservation, hasObservation
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="p-5 space-y-4">
+          <h3 className="font-semibold text-[#114C5F] text-lg border-b pb-2">
+            Plan Terapéutico
+          </h3>
+          <div className="space-y-2">
+            <div className="p-2 rounded">
+              <span className="text-sm font-medium text-gray-700">Plan Terapéutico:</span>
+              <span className="text-sm text-gray-900 ml-2">{atencion.PlanTerapeutico || 'No especificado'}</span>
+            </div>
+          </div>
+
+          <SectionObservation
+            sectionName="OBSERVACION_plan_terapeutico"
+            onAddObservation={onAddObservation}
+            hasObservation={hasObservation('OBSERVACION_plan_terapeutico')}
+            getObservationText={getObservationText}
+            estado={getObservationEstado?.('OBSERVACION_plan_terapeutico')}
+            onDelete={onDeleteObservation ? () => onDeleteObservation('OBSERVACION_plan_terapeutico') : undefined}
+            readOnly={readOnly}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-5 space-y-4">

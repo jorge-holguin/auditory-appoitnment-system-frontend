@@ -210,6 +210,7 @@ export function RevisionAtencionModal({
         EstadoAnimo: dataAtencion.atencionc?.animo || "Conservado",
         Orina: dataAtencion.atencionc?.orina || "Conservado",
         Deposiciones: dataAtencion.atencionc?.deposiciones || "Conservado",
+        SaludMaterna: dataAtencion.atencionc?.saludMaterna?.trim() || "NO APLICA",
 
         // Diagnósticos
         DiagnosticoPrincipal: "",
@@ -371,16 +372,17 @@ export function RevisionAtencionModal({
 
   const prettySectionLabel = (fieldName: string) => {
     const map: Record<string, string> = {
-      OBSERVACION_informacion_clinica: "Observación de la Información Clínica",
-      OBSERVACION_funciones_biologicas: "Observaciones de las Funciones Biológicas",
-      OBSERVACION_plan_terapeutico: "Observaciones del Plan Terapéutico y Destino",
+      OBSERVACION_funciones_vitales: "Observaciones de Funciones Vitales",
+      OBSERVACION_Atención_Principal_Motivo_Antecedentes: "Observaciones de Atención Principal / Motivo / Antecedentes",
       OBSERVACION_diagnosticos: "Observaciones de los Diagnósticos",
-      OBSERVACION_procedimientos: "Observaciones de los Procedimientos",
+      OBSERVACION_destino: "Observaciones del Destino",
+      OBSERVACION_farmacia: "Observaciones de la Receta Médica",
       OBSERVACION_laboratorio: "Observaciones de los Exámenes de Laboratorio",
       OBSERVACION_rayosx: "Observaciones de los Exámenes de Rayos X",
       OBSERVACION_ecografia: "Observaciones de los Exámenes de Ecografía",
-      OBSERVACION_farmacia: "Observaciones de la Receta Médica",
-      OBSERVACION_liquidaciones: "Observaciones de la Información de Liquidación",
+      OBSERVACION_procedimientos: "Observaciones de los Procedimientos",
+      OBSERVACION_observaciones_destino: "Observaciones de las Observaciones",
+      OBSERVACION_plan_terapeutico: "Observaciones del Plan Terapéutico",
     }
     return map[fieldName] || fieldName
   }
