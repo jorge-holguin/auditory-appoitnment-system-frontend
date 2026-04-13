@@ -204,8 +204,8 @@ export default function AuditPage() {
       
       const estadoActual = getEstadoString(cita.estadoAuditoria as any)
       
-      // Solo marcar como "En Revisión" si NO está en estado SUBSANADO, OBSERVADO o APROBADO
-      if (estadoActual !== "SUBSANADO" && estadoActual !== "OBSERVADO" && estadoActual !== "APROBADO") {
+      // Solo marcar como "En Revisión" si NO está en estado SUBSANADO, OBSERVADO, APROBADO o COMPLETADO
+      if (estadoActual !== "SUBSANADO" && estadoActual !== "OBSERVADO" && estadoActual !== "APROBADO" && estadoActual !== "COMPLETADO") {
         await marcarEnRevision(citaId)
         // Recargar la lista para reflejar el cambio de estado
         cargarCitas(pagination.page)
@@ -251,6 +251,8 @@ export default function AuditPage() {
       "OBSERVADO": "bg-red-100 text-red-800 border border-red-300",
       "SUBSANADO": "bg-purple-100 text-purple-800 border border-purple-300",
       "COMPLETADO": "bg-teal-100 text-teal-800 border border-teal-300",
+      "OBSERVADO_SIS": "bg-orange-100 text-orange-800 border border-orange-300",
+      "ENVIADO": "bg-indigo-100 text-indigo-800 border border-indigo-300",
     }
     return badges[estado as keyof typeof badges] || "bg-gray-100 text-gray-800 border border-gray-300"
   }
@@ -263,6 +265,8 @@ export default function AuditPage() {
       "OBSERVADO": "Observado",
       "SUBSANADO": "Subsanado",
       "COMPLETADO": "Completado",
+      "OBSERVADO_SIS": "Observado SIS",
+      "ENVIADO": "Enviado",
     }
     return labels[estado as keyof typeof labels] || estado
   }
@@ -406,6 +410,7 @@ export default function AuditPage() {
                 <TableHead className="font-semibold text-[#114C5F]">MÉDICO</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">FECHA Y HORA</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">ESTADO</TableHead>
+                <TableHead className="font-semibold text-[#114C5F]">AUDITOR</TableHead>
                 <TableHead className="font-semibold text-[#114C5F] text-center">FIRMADO</TableHead>
                 <TableHead className="font-semibold text-[#114C5F] text-center">ACCIONES</TableHead>
               </TableRow>
@@ -413,7 +418,7 @@ export default function AuditPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-[#4F9BB6]" />
                       <p className="text-gray-500">Cargando atenciones...</p>
@@ -422,7 +427,7 @@ export default function AuditPage() {
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <p className="text-red-500 font-medium">Error al cargar datos</p>
                       <p className="text-gray-500 text-sm">{error}</p>
@@ -435,13 +440,13 @@ export default function AuditPage() {
                 </TableRow>
               ) : atenciones.length === 0 && especialidad === "todos" && !citaId.trim() ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <p className="text-gray-500">Por favor seleccione una especialidad para ver las atenciones</p>
                   </TableCell>
                 </TableRow>
               ) : atenciones.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <p className="text-gray-500">No se encontraron atenciones con los filtros seleccionados</p>
                   </TableCell>
                 </TableRow>
@@ -478,6 +483,9 @@ export default function AuditPage() {
                       {getEstadoLabel(getEstadoString(atencion.estadoAuditoria as any))}
                     </span>
                   </TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {[atencion.auditorApepaterno, atencion.auditorApematerno, atencion.auditorNombres].filter(Boolean).join(' ') || '—'}
+                  </TableCell>
                   <TableCell className="text-center">
                     {atencion.firmado ? (
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
@@ -505,19 +513,23 @@ export default function AuditPage() {
                             size="sm"
                             variant="outline"
                             className="border-[#4A6EB0] text-[#4A6EB0] hover:bg-[#4A6EB0]/10"
-                            disabled={getEstadoString(atencion.estadoAuditoria as any) === "SUBSANADO" || getEstadoString(atencion.estadoAuditoria as any) === "COMPLETADO"}
+                            disabled={getEstadoString(atencion.estadoAuditoria as any) === "SUBSANADO"}
                           >
                             <RotateCcw className="w-4 h-4 mr-1" />
                             Revertir
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="border-[#9CD2D3]/60 shadow-xl">
+                        <AlertDialogContent className={`shadow-xl ${getEstadoString(atencion.estadoAuditoria as any) === "COMPLETADO" ? "border-red-300" : "border-[#9CD2D3]/60"}`}>
                           <AlertDialogHeader>
-                            <AlertDialogTitle className="text-lg font-semibold text-[#114C5F]">
-                              ¿Está seguro de revertir esta atención al estado PENDIENTE?
+                            <AlertDialogTitle className={`text-lg font-semibold ${getEstadoString(atencion.estadoAuditoria as any) === "COMPLETADO" ? "text-red-700" : "text-[#114C5F]"}`}>
+                              {getEstadoString(atencion.estadoAuditoria as any) === "COMPLETADO" 
+                                ? "⚠️ ¿Está seguro de revertir una atención COMPLETADA?"
+                                : "¿Está seguro de revertir esta atención al estado PENDIENTE?"}
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-sm text-gray-600">
-                              Esta acción cambiará el estado de auditoría de la atención a PENDIENTE. Podrá volver a modificarla más adelante, pero los cambios actuales de auditoría se verán afectados.
+                              {getEstadoString(atencion.estadoAuditoria as any) === "COMPLETADO" 
+                                ? "Esta atención ya fue COMPLETADA. Revertirla a PENDIENTE hará que vuelva a pasar por todo el proceso de auditoría. Esta acción es crítica y no se recomienda a menos que sea absolutamente necesario."
+                                : "Esta acción cambiará el estado de auditoría de la atención a PENDIENTE. Podrá volver a modificarla más adelante, pero los cambios actuales de auditoría se verán afectados."}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

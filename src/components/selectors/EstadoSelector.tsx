@@ -15,7 +15,9 @@ export function EstadoSelector({ value, onChange, label = "Estado" }: EstadoSele
     { value: "APROBADO", label: "Aprobado" },
     { value: "OBSERVADO", label: "Observado" },
     { value: "SUBSANADO", label: "Subsanado" },
-    { value: "COMPLETADO", label: "Completado" }
+    { value: "COMPLETADO", label: "Completado" },
+    { value: "OBSERVADO_SIS", label: "Observado SIS" },
+    { value: "ENVIADO", label: "Enviado" }
   ]
 
   return (

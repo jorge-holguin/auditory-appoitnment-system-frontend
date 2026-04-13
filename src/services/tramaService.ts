@@ -14,6 +14,9 @@ export interface Fua {
   fechaAtencion: string
   medico?: string // Nombre del médico
   firmado?: boolean // Indica si el FUA está firmado digitalmente
+  auditorApepaterno?: string | null
+  auditorApematerno?: string | null
+  auditorNombres?: string | null
 }
 
 export interface ListarFuasParams {
@@ -24,6 +27,7 @@ export interface ListarFuasParams {
   idEspecialidad?: string
   turnoConsulta?: string // M = Mañana, T = Tarde
   firmado?: string // FIRMADO, NO_FIRMADO, TODOS
+  usuarioAuditoria?: string // DNI del auditor
 }
 
 export interface DescargarZipRequest {
@@ -59,6 +63,11 @@ export async function listarFuas(params: ListarFuasParams): Promise<Fua[]> {
   // Agregar filtro de firmado solo si está definido y no es "TODOS"
   if (params.firmado && params.firmado !== "TODOS") {
     queryParams.append("firmado", params.firmado === "FIRMADO" ? "true" : "false")
+  }
+
+  // Agregar filtro de auditor (DNI) si está definido
+  if (params.usuarioAuditoria && params.usuarioAuditoria.trim() !== "") {
+    queryParams.append("usuarioAuditoria", params.usuarioAuditoria.trim())
   }
 
   const url = `${API_INTEROP_URL}/fua/listarFuas?${queryParams.toString()}`

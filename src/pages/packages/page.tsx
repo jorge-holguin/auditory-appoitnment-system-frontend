@@ -380,21 +380,19 @@ export default function PackagesPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado del Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
-                        {/* Acciones columna comentada - delete deshabilitado
                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
-                        */}
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                             Cargando paquetes...
                           </td>
                         </tr>
                       ) : paquetes.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                             No se encontraron paquetes
                           </td>
                         </tr>
@@ -404,7 +402,8 @@ export default function PackagesPage() {
                             key={paquete.idPaqueteSis}
                             onClick={() => handlePaqueteClick(paquete)}
                             className={`border-b cursor-pointer hover:bg-gray-50 ${
-                              paqueteSeleccionado?.idPaqueteSis === paquete.idPaqueteSis ? "bg-blue-50" : ""
+                              paqueteSeleccionado?.idPaqueteSis === paquete.idPaqueteSis ? "bg-blue-50" : 
+                              paquete.estado === "ENVIADO" ? "bg-amber-50 border-l-4 border-l-amber-500" : ""
                             }`}
                           >
                             <td className="px-4 py-3 text-sm">{paquete.codigoPaqueteSis}</td>
@@ -412,18 +411,18 @@ export default function PackagesPage() {
                               <span
                                 className={`px-2 py-1 rounded text-xs font-semibold ${
                                   paquete.estado === "ENVIADO"
-                                    ? "bg-blue-100 text-blue-800"
+                                    ? "bg-amber-100 text-amber-800 border border-amber-400 animate-pulse"
                                     : paquete.estado === "CREADO"
                                     ? "bg-yellow-100 text-yellow-800"
                                     : "bg-gray-100 text-gray-800"
                                 }`}
                               >
                                 {paquete.estado}
+                                {paquete.estado === "ENVIADO" && " ⚡"}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm">{paquete.fechaInicio}</td>
                             <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
-                            {/* Botón eliminar paquete comentado
                             <td className="px-4 py-3 text-center">
                               <Button
                                 size="sm"
@@ -439,7 +438,6 @@ export default function PackagesPage() {
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
-                            */}
                           </tr>
                         ))
                       )}
@@ -587,7 +585,6 @@ export default function PackagesPage() {
                                     )}
                                     Ver
                                   </Button>
-                                  {/* Botón eliminar atención comentado
                                   <Button
                                     size="sm"
                                     onClick={() => {
@@ -604,7 +601,6 @@ export default function PackagesPage() {
                                     )}
                                     Eliminar
                                   </Button>
-                                  */}
                                 </div>
                               </td>
                             </tr>
@@ -801,7 +797,14 @@ export default function PackagesPage() {
 
           <div className="mt-4 flex justify-end pt-3 border-t">
             <Button
-              onClick={() => setMostrarVerificacion(false)}
+              onClick={() => {
+                setMostrarVerificacion(false)
+                // Refrescar paquetes y detalles al cerrar el modal de verificación
+                fetchPaquetes()
+                if (paqueteSeleccionado) {
+                  fetchDetallesPaquete(paqueteSeleccionado.idPaqueteSis)
+                }
+              }}
               className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white px-4 py-1 text-sm"
             >
               Cerrar

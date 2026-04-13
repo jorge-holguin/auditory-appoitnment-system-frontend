@@ -1,12 +1,13 @@
-﻿import { useState, useEffect, useMemo, useRef } from "react"
+﻿import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, Calendar, CheckCircle2, Upload, Package, AlertTriangle, Check, X, ChevronDown, Search, Eye } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, CheckCircle2, Upload, Package, AlertTriangle, Check, X, Eye } from "lucide-react"
 
-import { OrigenSelector } from "@/components/selectors/OrigenSelector"
 import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
-import { EstadoFuaSelector } from "@/components/selectors/EstadoFuaSelector"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { FirmadoSelector } from "@/components/selectors/FirmadoSelector"
+import { AuditorSelector } from "@/components/selectors/AuditorSelector"
+import { MedicoSelector } from "@/components/selectors/MedicoSelector"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePickerAria } from "@/components/ui/DateRangePickerAria"
 import {
@@ -31,53 +32,15 @@ import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { format } from "date-fns"
 import { parseDate } from "@internationalized/date"
 
-// Función para obtener médicos del backend
-interface Medico {
-  nombre: string
-  medicoId: string
-}
-
-const API_CITAS_URL = import.meta.env.VITE_API_CITAS_URL
-
-async function obtenerMedicosPorFecha(fechaInicio: Date, fechaFin: Date, idEspecialidadSolicitud: string): Promise<Medico[]> {
-  const formatDate = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-
-  const url = `${API_CITAS_URL}/cita/medicos?fechaInicio=${formatDate(fechaInicio)}&fechaFin=${formatDate(fechaFin)}&idEspecialidadSolicitud=${idEspecialidadSolicitud}`
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "accept": "application/json"
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Error al obtener médicos: ${response.status} ${response.statusText}`)
-    }
-
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Error en obtenerMedicosPorFecha:", error)
-    throw error
-  }
-}
-
 
 export default function PlotPage() {
   // Estados para filtros
-  const [origen, setOrigen] = useState<string>("CE")
   const [especialidad, setEspecialidad] = useState<string>("0001") // TERAPIA FISICA
-  const [medicosSeleccionados, setMedicosSeleccionados] = useState<Set<string>>(new Set())
-  const [estado, setEstado] = useState<string>("2")
+  const [medico, setMedico] = useState<string>("todos")
+  const [estado, setEstado] = useState<string>("3") // APROBADO por defecto
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
   const [filtroFirmado, setFiltroFirmado] = useState<string>("FIRMADO")
+  const [auditor, setAuditor] = useState<string>("")
   const [busquedaFua, setBusquedaFua] = useState<string>("")
   
   // Estado para selección de FUAs
@@ -103,12 +66,6 @@ export default function PlotPage() {
     return new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day)
   }, [dateRange.end?.year, dateRange.end?.month, dateRange.end?.day])
   
-  // Estado para búsqueda de médicos en el dropdown
-  const [busquedaMedico, setBusquedaMedico] = useState<string>("")
-  const [medicoDropdownOpen, setMedicoDropdownOpen] = useState(false)
-  const medicoDropdownRef = useRef<HTMLDivElement>(null)
-  const [medicosDisponibles, setMedicosDisponibles] = useState<Medico[]>([])
-  const [loadingMedicos, setLoadingMedicos] = useState(false)
   const [fuas, setFuas] = useState<Fua[]>([])
   const [loading, setLoading] = useState(false)
   const [cargandoEnvioPaquete, setCargandoEnvioPaquete] = useState(false)
@@ -138,6 +95,9 @@ export default function PlotPage() {
   
   // Estados para errores detallados
   const [errorDetails, setErrorDetails] = useState<ErrorDetalle[] | null>(null)
+
+  // Estado para dialog de advertencia OBSERVADO_SIS
+  const [showObservadoSisWarning, setShowObservadoSisWarning] = useState(false)
 
   // Función para extraer el correlativo del nombre del archivo
   const obtenerCorrelativo = (nombreArchivo: string, longitud: number = 5): string => {
@@ -170,45 +130,13 @@ export default function PlotPage() {
     descargarBlob(blob, nombreArchivo)
   }
 
-  // Cerrar dropdown al hacer click fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (medicoDropdownRef.current && !medicoDropdownRef.current.contains(event.target as Node)) {
-        setMedicoDropdownOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-  useEffect(() => {
-    const cargarMedicos = async () => {
-      if (!fechaInicioMemo || !fechaFinMemo || !especialidad || especialidad === "todos") {
-        setMedicosDisponibles([])
-        return
-      }
-
-      setLoadingMedicos(true)
-      try {
-        const data = await obtenerMedicosPorFecha(fechaInicioMemo, fechaFinMemo, especialidad)
-        setMedicosDisponibles(data)
-      } catch (error) {
-        console.error("Error al cargar médicos:", error)
-        setMedicosDisponibles([])
-      } finally {
-        setLoadingMedicos(false)
-      }
-    }
-
-    cargarMedicos()
-  }, [fechaInicioMemo, fechaFinMemo, especialidad])
-
   // Cargar FUAs al montar y cuando cambien los filtros
   useEffect(() => {
     if (dateRange.start && dateRange.end) {
       cargarFuas()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origen, especialidad, estado, turno, filtroFirmado, dateRange])
+  }, [especialidad, estado, turno, filtroFirmado, auditor, dateRange])
 
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
@@ -225,11 +153,12 @@ export default function PlotPage() {
       const params = {
         fechaInicial,
         fechaFinal,
-        idOrigen: origen !== "todos" ? origen : "CE",
+        idOrigen: "CE",
         idEstado: estado !== "todos" ? parseInt(estado) : 2,
         idEspecialidad: especialidad !== "todos" ? especialidad : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
-        firmado: filtroFirmado !== "TODOS" ? filtroFirmado : undefined
+        firmado: filtroFirmado !== "TODOS" ? filtroFirmado : undefined,
+        usuarioAuditoria: auditor.trim() !== "" ? auditor.trim() : undefined
       }
 
       const data = await listarFuas(params)
@@ -245,6 +174,25 @@ export default function PlotPage() {
     }
   }
 
+  // Obtener IDs válidos para generar paquete (filtrando ENVIADO estado=8)
+  const obtenerIdsParaPaquete = (): string[] => {
+    const idsBase = selectedFuas.size > 0 
+      ? Array.from(selectedFuas) 
+      : fuasFiltradas.map(fua => fua.id)
+
+    // Filtrar atenciones en estado ENVIADO (8) para evitar doble envío
+    const idsEnviados = new Set(fuas.filter(f => f.estado === "8" || f.estado === "ENVIADO").map(f => f.id))
+    return idsBase.filter(id => !idsEnviados.has(id))
+  }
+
+  // Verificar si hay atenciones OBSERVADO_SIS en la selección
+  const tieneObservadoSis = (): boolean => {
+    const idsSeleccionados = selectedFuas.size > 0 
+      ? Array.from(selectedFuas) 
+      : fuasFiltradas.map(fua => fua.id)
+    return fuas.some(f => idsSeleccionados.includes(f.id) && (f.estado === "7" || f.estado === "OBSERVADO_SIS"))
+  }
+
   const handleGenerarPaquete = async () => {
     if (!dateRange.start || !dateRange.end) {
       alert("Por favor seleccione un rango de fechas")
@@ -256,18 +204,15 @@ export default function PlotPage() {
       return
     }
 
-    // Usar FUAs seleccionados o todos si no hay selección
-    const idsAtencion = selectedFuas.size > 0 
-      ? Array.from(selectedFuas) 
-      : fuas.map(fua => fua.id)
+    const idsAtencion = obtenerIdsParaPaquete()
 
     if (idsAtencion.length === 0) {
-      alert("No hay FUAs para generar el paquete. Por favor seleccione al menos una atención.")
+      alert("No hay FUAs válidas para generar el paquete. Las atenciones en estado ENVIADO no pueden enviarse nuevamente.")
       return
     }
 
     if (idsAtencion.length < 10) {
-      alert(`Debe seleccionar al menos 10 atenciones para generar el paquete. Actualmente tiene ${idsAtencion.length} seleccionadas.`)
+      alert(`Debe seleccionar al menos 10 atenciones para generar el paquete. Actualmente tiene ${idsAtencion.length} válidas (se excluyeron las que están en estado ENVIADO).`)
       return
     }
 
@@ -276,16 +221,30 @@ export default function PlotPage() {
       return
     }
 
+    // Si hay atenciones OBSERVADO_SIS, mostrar advertencia antes de continuar
+    if (tieneObservadoSis()) {
+      setShowObservadoSisWarning(true)
+      return
+    }
+
+    await ejecutarGenerarPaquete(idsAtencion)
+  }
+
+  const ejecutarGenerarPaquete = async (idsAtencion?: string[]) => {
+    if (!dateRange.start || !dateRange.end) return
+
+    const ids = idsAtencion || obtenerIdsParaPaquete()
+
     setCargandoEnvioPaquete(true)
     try {
       const fechaInicio = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
       const fechaFin = format(new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day), "dd-MM-yyyy")
 
       // Obtener nombre de la especialidad
-      const especialidadNombre = fuas.find(f => f.id === idsAtencion[0])?.especialidad || "ESPECIALIDAD"
+      const especialidadNombre = fuas.find(f => f.id === ids[0])?.especialidad || "ESPECIALIDAD"
 
       const request: DescargarZipRequest = {
-        idsAtencion,
+        idsAtencion: ids,
         idPaqueteSis: "00004",
         crearPaqueteDb: true,
         fechaInicio,
@@ -341,6 +300,10 @@ export default function PlotPage() {
         setIsErrorDialog(false)
         setErrorDetails(null)
         setSuccessMessage(`${respuestaSis.mensaje}\n\nEl paquete ${paqueteGenerado.nombreArchivo} (ID Correlativo: ${idCorrelativo}) fue procesado exitosamente y su estado ha sido actualizado a ENVIADO.`)
+        
+        // Refrescar la lista de FUAs ya que las atenciones enviadas cambian de estado
+        cargarFuas()
+        setSelectedFuas(new Set())
       } else {
         // Error del SIS con detalles
         setIsErrorDialog(true)
@@ -372,12 +335,12 @@ export default function PlotPage() {
   }
 
   const handleLimpiarFiltros = () => {
-    setOrigen("CE")
     setEspecialidad("0001") // TERAPIA FISICA
-    setMedicosSeleccionados(new Set())
-    setEstado("2")
+    setMedico("todos")
+    setEstado("3")
     setTurno("TODOS")
     setFiltroFirmado("FIRMADO")
+    setAuditor("")
     setBusquedaFua("")
     const today = new Date()
     const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
@@ -413,9 +376,8 @@ export default function PlotPage() {
       (filtroFirmado === "FIRMADO" && fua.firmado === true) ||
       (filtroFirmado === "NO_FIRMADO" && fua.firmado === false)
     
-    // Filtro por médico (frontend) - si no hay médicos seleccionados, muestra todos
-    const matchesMedico = medicosSeleccionados.size === 0 || 
-      medicosSeleccionados.has(fua.medico || '')
+    // Filtro por médico (frontend)
+    const matchesMedico = medico === "todos" || fua.medico === medico
     
     return matchesBusqueda && matchesFirmado && matchesMedico
   })
@@ -447,33 +409,29 @@ export default function PlotPage() {
         <div>
           {/* Filtros responsive - Una sola instancia de cada componente */}
           <div className="space-y-4 mb-6">
-            {/* Fila 1: Fecha - Origen - Firmado */}
+            {/* Fila 1: Fecha - Firmado - Turno */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <div className="relative">
-                  <DateRangePickerAria
-                    value={dateRange}
-                    onChange={setDateRange}
-                    label="Fecha"
-                  />
-                  <Calendar className="absolute right-3 top-9 w-4 h-4 text-gray-400 pointer-events-none hidden lg:block" />
-                </div>
+                <DateRangePickerAria
+                  value={dateRange}
+                  onChange={setDateRange}
+                  label="Fecha"
+                />
               </div>
-              
-              <OrigenSelector
-                value={origen}
-                onChange={setOrigen}
-                label="Origen"
-              />
               
               <FirmadoSelector
                 value={filtroFirmado}
                 onChange={setFiltroFirmado}
                 label="Firmado"
               />
+
+              <TurnoSelector
+                value={turno}
+                onChange={setTurno}
+              />
             </div>
             
-            {/* Fila 2: Especialidad - Médico - Turno */}
+            {/* Fila 2: Especialidad - Médico - Auditor */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
               <EspecialidadSimpleSelector
                 value={especialidad}
@@ -482,107 +440,23 @@ export default function PlotPage() {
                 defaultOpen={true}
               />
               
-              {/* Selector de Médicos con Dropdown y Checkboxes */}
-              <div className="relative" ref={medicoDropdownRef}>
-                <label className="block text-sm font-medium text-[#114C5F] mb-2">
-                  Médicos
-                </label>
-                <button
-                  onClick={() => setMedicoDropdownOpen(!medicoDropdownOpen)}
-                  className="w-full px-3 py-2 border border-[#9CD2D3] rounded-md bg-white text-left flex items-center justify-between hover:border-[#4F9BB6] transition-colors"
-                >
-                  <span className="text-sm text-gray-700 truncate">
-                    {medicosSeleccionados.size === 0 
-                      ? "Todos los médicos" 
-                      : `${medicosSeleccionados.size} médico(s) seleccionado(s)`}
-                  </span>
-                  {loadingMedicos ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                  ) : (
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${medicoDropdownOpen ? 'rotate-180' : ''}`} />
-                  )}
-                </button>
-                
-                {medicoDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#9CD2D3] rounded-md shadow-lg max-h-[250px] flex flex-col">
-                    {/* Búsqueda */}
-                    <div className="p-2 border-b border-gray-100">
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={busquedaMedico}
-                          onChange={(e) => setBusquedaMedico(e.target.value)}
-                          placeholder="Buscar médico..."
-                          className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-[#4F9BB6]"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Lista de checkboxes */}
-                    <div className="overflow-y-auto flex-1 p-2 space-y-1">
-                      {medicosDisponibles.length === 0 ? (
-                        <span className="text-sm text-gray-500 italic block py-2">
-                          {loadingMedicos ? "Cargando..." : "No hay médicos disponibles"}
-                        </span>
-                      ) : (
-                        medicosDisponibles
-                          .filter(med => med.medicoId.toLowerCase().includes(busquedaMedico.toLowerCase()))
-                          .sort((a, b) => a.medicoId.localeCompare(b.medicoId))
-                          .map((med) => (
-                            <div key={med.nombre} className="flex items-center space-x-2 py-1 hover:bg-gray-50 rounded px-1">
-                              <Checkbox
-                                id={`med-dropdown-${med.nombre}`}
-                                checked={medicosSeleccionados.has(med.medicoId)}
-                                onCheckedChange={(checked) => {
-                                  setMedicosSeleccionados(prev => {
-                                    const newSet = new Set(prev)
-                                    if (checked) {
-                                      newSet.add(med.medicoId)
-                                    } else {
-                                      newSet.delete(med.medicoId)
-                                    }
-                                    return newSet
-                                  })
-                                }}
-                              />
-                              <label
-                                htmlFor={`med-dropdown-${med.nombre}`}
-                                className="text-sm text-gray-700 cursor-pointer truncate flex-1"
-                                title={`${med.medicoId} (${med.nombre})`}
-                              >
-                                {med.medicoId}
-                              </label>
-                            </div>
-                          ))
-                      )}
-                    </div>
-                    
-                    {/* Footer con limpiar */}
-                    {medicosSeleccionados.size > 0 && (
-                      <div className="p-2 border-t border-gray-100 bg-gray-50">
-                        <button
-                          onClick={() => {
-                            setMedicosSeleccionados(new Set())
-                            setBusquedaMedico("")
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-800 underline w-full text-left"
-                        >
-                          Limpiar selección ({medicosSeleccionados.size})
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <MedicoSelector
+                value={medico}
+                onChange={setMedico}
+                label="Médicos"
+                fechaInicio={fechaInicioMemo}
+                fechaFin={fechaFinMemo}
+                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : undefined}
+              />
               
-              <TurnoSelector
-                value={turno}
-                onChange={setTurno}
+              <AuditorSelector
+                value={auditor}
+                onChange={setAuditor}
+                label="Auditor"
               />
             </div>
 
-            {/* Fila 3: Buscar ID Atención - Estado - Botón Generar Paquete */}
+            {/* Fila 3: Buscar por Id Atención Seguro - Estado - Botón Generar Paquete */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <div>
                 <label className="block text-sm font-medium text-[#114C5F] mb-2">
@@ -597,11 +471,18 @@ export default function PlotPage() {
                 />
               </div>
 
-              <EstadoFuaSelector
-                value={estado}
-                onChange={setEstado}
-                label="Estado"
-              />
+              <div>
+                <label className="block text-sm font-medium text-[#114C5F] mb-2">Estado</label>
+                <select
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#9CD2D3] rounded-md bg-white text-sm text-[#114C5F] focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all"
+                >
+                  <option value="3">Aprobado</option>
+                  <option value="7">Observado SIS</option>
+                  <option value="8">Enviado</option>
+                </select>
+              </div>
               
               <Button 
                 onClick={handleGenerarPaquete}
@@ -651,6 +532,7 @@ export default function PlotPage() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Auditor</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Firmado</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                   </tr>
@@ -658,14 +540,14 @@ export default function PlotPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Cargando FUAs...
                       </td>
                     </tr>
                   ) : fuasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                         {especialidad === "todos" 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
                           : busquedaFua.trim()
@@ -677,7 +559,10 @@ export default function PlotPage() {
                     pageFuas.map((fua) => (
                       <tr 
                         key={fua.id}
-                        className="border-b hover:bg-gray-50"
+                        className={`border-b hover:bg-gray-50 ${
+                          (fua.estado === "8" || fua.estado === "ENVIADO") ? "bg-blue-50/60" : 
+                          (fua.estado === "7" || fua.estado === "OBSERVADO_SIS") ? "bg-orange-50/60" : ""
+                        }`}
                       >
                         <td className="px-4 py-3 text-center">
                         <Checkbox
@@ -704,19 +589,22 @@ export default function PlotPage() {
                         <td className="px-4 py-3 text-sm">
                           <span
                             className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wide ${
-                              fua.estado === "2" || fua.estado === "PENDIENTE"
-                                ? "bg-green-100 text-green-800"
-                                : fua.estado === "3" || fua.estado === "EN PROCESO"
-                                ? "bg-cyan-100 text-cyan-800"
-                                : fua.estado === "1" || fua.estado === "CERRADO"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
+                              estado === "3"
+                                ? "bg-green-100 text-green-800 border border-green-300"
+                                : estado === "7"
+                                ? "bg-red-100 text-red-800 border border-red-300"
+                                : estado === "8"
+                                ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                                : "bg-gray-100 text-gray-800"
                             }`}
                           >
-                            {fua.estado === "2" ? "Pendiente" : fua.estado === "3" ? "Validado" : fua.estado === "4" ? "Cerrado" : fua.estado}
+                            {estado === "3" ? "Aprobado" : estado === "7" ? "Obs. SIS" : estado === "8" ? "Enviado" : fua.estado}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{fua.nombreEspecialidad || fua.especialidad || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {[fua.auditorApepaterno, fua.auditorApematerno, fua.auditorNombres].filter(Boolean).join(' ') || '—'}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           {fua.firmado ? (
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
@@ -986,6 +874,37 @@ export default function PlotPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de advertencia para atenciones OBSERVADO_SIS */}
+      <AlertDialog open={showObservadoSisWarning} onOpenChange={setShowObservadoSisWarning}>
+        <AlertDialogContent className="border-orange-200 shadow-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-semibold text-orange-700 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Atenciones Observadas por el SIS
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-gray-600">
+              Algunas de las atenciones seleccionadas tienen el estado <strong className="text-orange-700">OBSERVADO SIS</strong>, lo que significa que fueron observadas durante un envío anterior. 
+              <br /><br />
+              <strong>Asegúrese de que las observaciones hayan sido corregidas</strong> antes de generar el paquete nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700 text-white shadow-md"
+              onClick={() => {
+                setShowObservadoSisWarning(false)
+                ejecutarGenerarPaquete()
+              }}
+            >
+              Sí, generar paquete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de Revisión de FUA */}
       {modalFua && (

@@ -19,6 +19,10 @@ function getEstadoNumero(estadoAuditoria: string): number {
       return 5
     case "COMPLETADO":
       return 6
+    case "OBSERVADO_SIS":
+      return 7
+    case "ENVIADO":
+      return 8
     default:
       return 1
   }
@@ -46,6 +50,10 @@ export function getEstadoString(estadoAuditoria: number | string | null | undefi
       return "SUBSANADO"
     case 6:
       return "COMPLETADO"
+    case 7:
+      return "OBSERVADO_SIS"
+    case 8:
+      return "ENVIADO"
     default:
       return "PENDIENTE"
   }
@@ -79,6 +87,9 @@ export interface Cita {
   estadoAuditoria?: string // Estado de auditoría (PENDIENTE, EN_REVISION, APROBADO, OBSERVADO)
   especialidad?: string
   firmado?: boolean // Indica si el FUA está firmado digitalmente
+  auditorApepaterno?: string | null
+  auditorApematerno?: string | null
+  auditorNombres?: string | null
   // Campos adicionales que pueda tener la API
   [key: string]: any
 }
