@@ -2,12 +2,13 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, Trash2 } from "lucide-react"
+import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye } from "lucide-react"
+// import { Trash2 } from "lucide-react" // Comentado junto con acciones de eliminar
 import { obtenerCitaIdPorAtencion } from "@/services/citaService"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
-import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { extractDocumentFromToken } from "@/utils/jwtUtils"
+// import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService" // Comentado junto con acciones de eliminar
+// import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog" // Comentado junto con acciones de eliminar
+// import { extractDocumentFromToken } from "@/utils/jwtUtils" // Comentado junto con acciones de eliminar
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import {
@@ -117,15 +118,15 @@ export default function PackagesPage() {
   const [mostrarVerificacion, setMostrarVerificacion] = useState(false)
   const [errorVerificacion, setErrorVerificacion] = useState<string | null>(null)
 
-  // Estados para eliminar paquete
-  const [showDeletePaqueteDialog, setShowDeletePaqueteDialog] = useState(false)
-  const [paqueteAEliminar, setPaqueteAEliminar] = useState<Paquete | null>(null)
-  const [loadingDeletePaquete, setLoadingDeletePaquete] = useState(false)
+  // Estados para eliminar paquete - comentados junto con acciones de eliminar
+  // const [showDeletePaqueteDialog, setShowDeletePaqueteDialog] = useState(false)
+  // const [paqueteAEliminar, setPaqueteAEliminar] = useState<Paquete | null>(null)
+  // const [loadingDeletePaquete, setLoadingDeletePaquete] = useState(false)
 
-  // Estados para eliminar atención individual
-  const [showDeleteAtencionDialog, setShowDeleteAtencionDialog] = useState(false)
-  const [atencionAEliminar, setAtencionAEliminar] = useState<DetallePaquete | null>(null)
-  const [loadingDeleteAtencion, setLoadingDeleteAtencion] = useState(false)
+  // Estados para eliminar atención individual - comentados junto con acciones de eliminar
+  // const [showDeleteAtencionDialog, setShowDeleteAtencionDialog] = useState(false)
+  // const [atencionAEliminar, setAtencionAEliminar] = useState<DetallePaquete | null>(null)
+  // const [loadingDeleteAtencion, setLoadingDeleteAtencion] = useState(false)
 
   const tamanio = 10
 
@@ -257,7 +258,8 @@ export default function PackagesPage() {
     fetchPaquetes()
   }
 
-  // Eliminar paquete completo
+  // Eliminar paquete completo - comentado junto con acciones de eliminar
+  /*
   const handleConfirmDeletePaquete = async () => {
     if (!paqueteAEliminar) return
     const usuario = extractDocumentFromToken()
@@ -282,8 +284,10 @@ export default function PackagesPage() {
       setLoadingDeletePaquete(false)
     }
   }
+  */
 
-  // Eliminar atención individual
+  // Eliminar atención individual - comentado junto con acciones de eliminar
+  /*
   const handleConfirmDeleteAtencion = async () => {
     if (!atencionAEliminar) return
     setLoadingDeleteAtencion(true)
@@ -301,6 +305,7 @@ export default function PackagesPage() {
       setLoadingDeleteAtencion(false)
     }
   }
+  */
 
   const handleLimpiarFiltros = () => {
     setEstado("todos")
@@ -378,21 +383,21 @@ export default function PackagesPage() {
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° Paquete</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado del Paquete</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Creación</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Periodo</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                             Cargando paquetes...
                           </td>
                         </tr>
                       ) : paquetes.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                             No se encontraron paquetes
                           </td>
                         </tr>
@@ -421,8 +426,16 @@ export default function PackagesPage() {
                                 {paquete.estado === "ENVIADO" && " ⚡"}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm">{paquete.fechaInicio}</td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              {paquete.fechaCreacion 
+                                ? new Date(paquete.fechaCreacion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600">
+                              {paquete.fechaInicio} — {paquete.fechaFin}
+                            </td>
                             <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
+                            {/* Botón eliminar paquete - comentado por ahora
                             <td className="px-4 py-3 text-center">
                               <Button
                                 size="sm"
@@ -434,10 +447,12 @@ export default function PackagesPage() {
                                 }}
                                 className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 title="Eliminar paquete"
+                                disabled={paquete.estado === "COMPLETADO"}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
+                            */}
                           </tr>
                         ))
                       )}
@@ -585,13 +600,14 @@ export default function PackagesPage() {
                                     )}
                                     Ver
                                   </Button>
+                                  {/* Botón eliminar atención - comentado por ahora
                                   <Button
                                     size="sm"
                                     onClick={() => {
                                       setAtencionAEliminar(detalle)
                                       setShowDeleteAtencionDialog(true)
                                     }}
-                                    disabled={loadingDeleteAtencion && atencionAEliminar?.id === detalle.id}
+                                    disabled={(loadingDeleteAtencion && atencionAEliminar?.id === detalle.id) || paqueteSeleccionado?.estado === "COMPLETADO"}
                                     className="bg-red-600 hover:bg-red-700 text-white text-xs h-6 px-2"
                                   >
                                     {loadingDeleteAtencion && atencionAEliminar?.id === detalle.id ? (
@@ -601,6 +617,7 @@ export default function PackagesPage() {
                                     )}
                                     Eliminar
                                   </Button>
+                                  */}
                                 </div>
                               </td>
                             </tr>
@@ -813,7 +830,7 @@ export default function PackagesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de confirmación para eliminar paquete */}
+      {/* Dialog de confirmación para eliminar paquete - comentado por ahora
       <AlertDialog open={showDeletePaqueteDialog} onOpenChange={setShowDeletePaqueteDialog}>
         <AlertDialogContent className="border-red-200 shadow-xl">
           <AlertDialogHeader>
@@ -843,8 +860,9 @@ export default function PackagesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      */}
 
-      {/* Dialog de confirmación para eliminar atención */}
+      {/* Dialog de confirmación para eliminar atención - comentado por ahora
       <AlertDialog open={showDeleteAtencionDialog} onOpenChange={setShowDeleteAtencionDialog}>
         <AlertDialogContent className="border-red-200 shadow-xl">
           <AlertDialogHeader>
@@ -874,6 +892,7 @@ export default function PackagesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      */}
 
       {/* Modal de Revisión de FUA */}
       {modalDetalle && (

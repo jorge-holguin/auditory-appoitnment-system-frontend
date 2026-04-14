@@ -478,9 +478,11 @@ export default function PlotPage() {
                   onChange={(e) => setEstado(e.target.value)}
                   className="w-full px-3 py-2 border border-[#9CD2D3] rounded-md bg-white text-sm text-[#114C5F] focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all"
                 >
+                  
                   <option value="3">Aprobado</option>
                   <option value="7">Observado SIS</option>
                   <option value="8">Enviado</option>
+                  <option value="6">Completado</option>
                 </select>
               </div>
               
@@ -595,10 +597,12 @@ export default function PlotPage() {
                                 ? "bg-red-100 text-red-800 border border-red-300"
                                 : estado === "8"
                                 ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                                : estado === "6"
+                                ? "bg-teal-100 text-teal-800 border border-teal-300"
                                 : "bg-gray-100 text-gray-800"
                             }`}
                           >
-                            {estado === "3" ? "Aprobado" : estado === "7" ? "Obs. SIS" : estado === "8" ? "Enviado" : fua.estado}
+                            {estado === "3" ? "Aprobado" : estado === "7" ? "Obs. SIS" : estado === "8" ? "Enviado" : estado === "6" ? "Completado" : fua.estado}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{fua.nombreEspecialidad || fua.especialidad || 'N/A'}</td>
