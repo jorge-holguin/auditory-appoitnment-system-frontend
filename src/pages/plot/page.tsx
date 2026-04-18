@@ -1,12 +1,10 @@
-﻿import { useState, useEffect, useMemo } from "react"
+﻿import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, FilterX, Download, Loader2, CheckCircle2, Upload, Package, AlertTriangle, Check, X, Eye } from "lucide-react"
 
-import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
-import { FirmadoSelector } from "@/components/selectors/FirmadoSelector"
-import { AuditorSelector } from "@/components/selectors/AuditorSelector"
-import { MedicoSelector } from "@/components/selectors/MedicoSelector"
+import { EspecialidadMultiSelector } from "@/components/selectors/EspecialidadMultiSelector"
+import { extractDocumentFromToken } from "@/utils/jwtUtils"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DateRangePickerAria } from "@/components/ui/DateRangePickerAria"
@@ -35,13 +33,11 @@ import { parseDate } from "@internationalized/date"
 
 export default function PlotPage() {
   // Estados para filtros
-  const [especialidad, setEspecialidad] = useState<string>("0001") // TERAPIA FISICA
-  const [medico, setMedico] = useState<string>("todos")
+  const [especialidades, setEspecialidades] = useState<string[]>([]) // selector auto-completa con todas
   const [estado, setEstado] = useState<string>("3") // APROBADO por defecto
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
-  const [filtroFirmado, setFiltroFirmado] = useState<string>("FIRMADO")
-  const [auditor, setAuditor] = useState<string>("")
-  const [busquedaFua, setBusquedaFua] = useState<string>("")
+  const [soloFirmados, setSoloFirmados] = useState<boolean>(true)
+  const [misAuditorias, setMisAuditorias] = useState<boolean>(true)
   
   // Estado para selección de FUAs
   const [selectedFuas, setSelectedFuas] = useState<Set<string>>(new Set())
@@ -55,16 +51,6 @@ export default function PlotPage() {
     end: todayParsed,
   })
 
-  // Memoizar fechas para evitar recreación en cada render (evita múltiples llamadas a la API de médicos)
-  const fechaInicioMemo = useMemo(() => {
-    if (!dateRange.start) return undefined
-    return new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day)
-  }, [dateRange.start?.year, dateRange.start?.month, dateRange.start?.day])
-
-  const fechaFinMemo = useMemo(() => {
-    if (!dateRange.end) return undefined
-    return new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day)
-  }, [dateRange.end?.year, dateRange.end?.month, dateRange.end?.day])
   
   const [fuas, setFuas] = useState<Fua[]>([])
   const [loading, setLoading] = useState(false)
@@ -130,13 +116,17 @@ export default function PlotPage() {
     descargarBlob(blob, nombreArchivo)
   }
 
-  // Cargar FUAs al montar y cuando cambien los filtros
+  // Cargar FUAs al montar y cuando cambien los filtros.
+  // Se salta la llamada cuando `especialidades` está vacío: en el mount inicial
+  // el multi-selector aún no ha auto-seleccionado todas; se dispararía una llamada
+  // sin `idEspecialidades`. Cuando el selector completa su fetch y llama onChange
+  // con todos los IDs, este useEffect se re-ejecuta con el array poblado.
   useEffect(() => {
-    if (dateRange.start && dateRange.end) {
-      cargarFuas()
-    }
+    if (!dateRange.start || !dateRange.end) return
+    if (especialidades.length === 0) return
+    cargarFuas()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [especialidad, estado, turno, filtroFirmado, auditor, dateRange])
+  }, [especialidades, estado, turno, soloFirmados, misAuditorias, dateRange])
 
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
@@ -155,10 +145,10 @@ export default function PlotPage() {
         fechaFinal,
         idOrigen: "CE",
         idEstado: estado !== "todos" ? parseInt(estado) : 2,
-        idEspecialidad: especialidad !== "todos" ? especialidad : undefined,
+        idEspecialidades: especialidades.length > 0 ? especialidades : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
-        firmado: filtroFirmado !== "TODOS" ? filtroFirmado : undefined,
-        usuarioAuditoria: auditor.trim() !== "" ? auditor.trim() : undefined
+        firmado: soloFirmados ? "FIRMADO" : undefined,
+        usuarioAuditoria: misAuditorias ? extractDocumentFromToken() || undefined : undefined
       }
 
       const data = await listarFuas(params)
@@ -199,8 +189,8 @@ export default function PlotPage() {
       return
     }
 
-    if (especialidad === "todos") {
-      alert("Por favor seleccione una especialidad específica")
+    if (especialidades.length === 0) {
+      alert("Por favor seleccione al menos una especialidad")
       return
     }
 
@@ -335,13 +325,11 @@ export default function PlotPage() {
   }
 
   const handleLimpiarFiltros = () => {
-    setEspecialidad("0001") // TERAPIA FISICA
-    setMedico("todos")
+    setEspecialidades([]) // selector auto-completa con todas
     setEstado("3")
     setTurno("TODOS")
-    setFiltroFirmado("FIRMADO")
-    setAuditor("")
-    setBusquedaFua("")
+    setSoloFirmados(true)
+    setMisAuditorias(true)
     const today = new Date()
     const todayParsed = parseDate(format(today, "yyyy-MM-dd"))
     setDateRange({ start: todayParsed, end: todayParsed })
@@ -365,21 +353,14 @@ export default function PlotPage() {
     }
   }
 
-  // Filtrar FUAs por búsqueda de ID atención seguro, por estado de firmado y por médico (frontend)
+  // Filtrar FUAs (frontend filter for multi-specialty)
   const fuasFiltradas = fuas.filter(fua => {
-    // Filtro por búsqueda de ID atención seguro
-    const matchesBusqueda = !busquedaFua.trim() || 
-      fua.id?.toLowerCase().includes(busquedaFua.toLowerCase())
-    
-    // Filtro por firmado
-    const matchesFirmado = filtroFirmado === "TODOS" || 
-      (filtroFirmado === "FIRMADO" && fua.firmado === true) ||
-      (filtroFirmado === "NO_FIRMADO" && fua.firmado === false)
-    
-    // Filtro por médico (frontend)
-    const matchesMedico = medico === "todos" || fua.medico === medico
-    
-    return matchesBusqueda && matchesFirmado && matchesMedico
+    // Multi-specialty frontend filter (only needed when multiple selected, single is handled by API)
+    if (especialidades.length > 1) {
+      const fuaEsp = fua.idEspecialidadSgh || fua.especialidad || ''
+      if (!especialidades.includes(fuaEsp)) return false
+    }
+    return true
   })
 
   const totalPages = Math.max(1, Math.ceil(fuasFiltradas.length / pageSize) || 1)
@@ -407,69 +388,15 @@ export default function PlotPage() {
         </div>
         
         <div>
-          {/* Filtros responsive - Una sola instancia de cada componente */}
+          {/* Filtros compactos */}
           <div className="space-y-4 mb-6">
-            {/* Fila 1: Fecha - Firmado - Turno */}
+            {/* Fila 1: Fecha - Estado - Turno */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <DateRangePickerAria
-                  value={dateRange}
-                  onChange={setDateRange}
-                  label="Fecha"
-                />
-              </div>
-              
-              <FirmadoSelector
-                value={filtroFirmado}
-                onChange={setFiltroFirmado}
-                label="Firmado"
+              <DateRangePickerAria
+                value={dateRange}
+                onChange={setDateRange}
+                label="Fecha"
               />
-
-              <TurnoSelector
-                value={turno}
-                onChange={setTurno}
-              />
-            </div>
-            
-            {/* Fila 2: Especialidad - Médico - Auditor */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-              <EspecialidadSimpleSelector
-                value={especialidad}
-                onChange={setEspecialidad}
-                label="Especialidad"
-                defaultOpen={true}
-              />
-              
-              <MedicoSelector
-                value={medico}
-                onChange={setMedico}
-                label="Médicos"
-                fechaInicio={fechaInicioMemo}
-                fechaFin={fechaFinMemo}
-                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : undefined}
-              />
-              
-              <AuditorSelector
-                value={auditor}
-                onChange={setAuditor}
-                label="Auditor"
-              />
-            </div>
-
-            {/* Fila 3: Buscar por Id Atención Seguro - Estado - Botón Generar Paquete */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-              <div>
-                <label className="block text-sm font-medium text-[#114C5F] mb-2">
-                  Buscar por ID Atención Seguro
-                </label>
-                <input
-                  type="text"
-                  value={busquedaFua}
-                  onChange={(e) => setBusquedaFua(e.target.value)}
-                  placeholder="Ingrese ID de atención seguro..."
-                  className="w-full px-4 py-2 border border-[#9CD2D3] rounded-md focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all text-[#114C5F]"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-[#114C5F] mb-2">Estado</label>
@@ -478,12 +405,42 @@ export default function PlotPage() {
                   onChange={(e) => setEstado(e.target.value)}
                   className="w-full px-3 py-2 border border-[#9CD2D3] rounded-md bg-white text-sm text-[#114C5F] focus:ring-2 focus:ring-[#4F9BB6] focus:border-[#4F9BB6] transition-all"
                 >
-                  
                   <option value="3">Aprobado</option>
                   <option value="7">Observado SIS</option>
                   <option value="8">Enviado</option>
                   <option value="6">Completado</option>
                 </select>
+              </div>
+
+              <TurnoSelector
+                value={turno}
+                onChange={setTurno}
+              />
+            </div>
+            
+            {/* Fila 2: Especialidad - Opciones (checkboxes) - Generar Paquete */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <EspecialidadMultiSelector
+                value={especialidades}
+                onChange={setEspecialidades}
+                label="Especialidades"
+              />
+              
+              <div className="flex items-center gap-6 h-[38px]">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={soloFirmados}
+                    onCheckedChange={(checked) => setSoloFirmados(checked === true)}
+                  />
+                  <span className="text-sm font-medium text-[#114C5F]">Solo Firmados</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={misAuditorias}
+                    onCheckedChange={(checked) => setMisAuditorias(checked === true)}
+                  />
+                  <span className="text-sm font-medium text-[#114C5F]">Mis Auditorías</span>
+                </label>
               </div>
               
               <Button 
@@ -527,14 +484,13 @@ export default function PlotPage() {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">ID Atención</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° FUA</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Médico</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Auditor</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Firmado</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                   </tr>
@@ -542,18 +498,16 @@ export default function PlotPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Cargando FUAs...
                       </td>
                     </tr>
                   ) : fuasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
-                        {especialidad === "todos" 
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                        {especialidades.length === 0 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
-                          : busquedaFua.trim()
-                          ? `No se encontraron atenciones con el ID "${busquedaFua}"`
                           : "No se encontraron FUAs con los filtros seleccionados"}
                       </td>
                     </tr>
@@ -567,23 +521,23 @@ export default function PlotPage() {
                         }`}
                       >
                         <td className="px-4 py-3 text-center">
-                        <Checkbox
-                          key={`chk-${fua.id}`}
-                          checked={selectedFuas.has(fua.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedFuas(prev => {
-                              const newSelected = new Set(prev)
-                              if (checked) {
-                                newSelected.add(fua.id)
-                              } else {
-                                newSelected.delete(fua.id)
-                              }
-                              return newSelected
-                            })
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm font-mono">{fua.id}</td>
+                          <Checkbox
+                            key={`chk-${fua.id}`}
+                            checked={selectedFuas.has(fua.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedFuas(prev => {
+                                const newSelected = new Set(prev)
+                                if (checked) {
+                                  newSelected.add(fua.id)
+                                } else {
+                                  newSelected.delete(fua.id)
+                                }
+                                return newSelected
+                              })
+                            }}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono">{fua.numeroFua?.trim() || fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{fua.medico || 'N/A'}</td>
@@ -606,9 +560,6 @@ export default function PlotPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{fua.nombreEspecialidad || fua.especialidad || 'N/A'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {[fua.auditorApepaterno, fua.auditorApematerno, fua.auditorNombres].filter(Boolean).join(' ') || '—'}
-                        </td>
                         <td className="px-4 py-3 text-center">
                           {fua.firmado ? (
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
@@ -935,9 +886,3 @@ export default function PlotPage() {
     </div>
   )
 }
-
-
-
-
-
-

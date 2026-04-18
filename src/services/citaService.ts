@@ -76,6 +76,7 @@ export interface CitaResponse {
 export interface Cita {
   citaId: string
   paciente: string
+  pacienteId?: string // ID del paciente desde vista auditoría
   nombre: string
   consultorio: string
   consultorioNombre: string
@@ -90,6 +91,10 @@ export interface Cita {
   auditorApepaterno?: string | null
   auditorApematerno?: string | null
   auditorNombres?: string | null
+  numAtencion?: string // N° FUA de la atención (ej: "000059472600041488")
+  numeroFua?: string   // Alias alternativo del n° FUA, por compat
+  historia?: string    // N° historia clínica (formato antiguo)
+  numeroHistoria?: string // N° historia clínica desde vista auditoría
   // Campos adicionales que pueda tener la API
   [key: string]: any
 }
@@ -98,6 +103,7 @@ export interface BuscarCitasParams {
   desde: Date
   hasta: Date
   especialidad?: string
+  especialidades?: string[] // Múltiples especialidades (usa especialidadSolicitudArray)
   medico?: string
   turnoConsulta?: string
   estadoAuditoria?: string // Filtro por estado de auditoría
@@ -113,7 +119,8 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
   const {
     desde,
     hasta,
-    especialidad = "1091",
+    especialidad,
+    especialidades,
     medico,
     turnoConsulta,
     estadoAuditoria,
@@ -126,37 +133,46 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
   const desdeStr = format(desde, "dd/MM/yyyy")
   const hastaStr = format(hasta, "dd/MM/yyyy")
 
-  // Agregar ceros al inicio de la especialidad si es necesario
-  const especialidadFormatted = especialidad && especialidad !== "todos" 
-    ? especialidad.padStart(4, "0")
-    : "1091"
+  // Construcción explícita del query string para soportar
+  // especialidadSolicitudArray como parámetros repetidos
+  const parts: string[] = [
+    `desde=${encodeURIComponent(desdeStr)}`,
+    `hasta=${encodeURIComponent(hastaStr)}`,
+    `estado=4`, // Siempre 4 = Atendido
+    `sis=${sis.toString()}`,
+    `page=${page.toString()}`,
+    `size=${size.toString()}`,
+  ]
 
-  // Construir URL con parámetros
-  // Siempre usar estado=4 (Atendido) para obtener citas que ya fueron atendidas
-  const queryParams = new URLSearchParams({
-    desde: desdeStr,
-    hasta: hastaStr,
-    especialidadSolicitud: especialidadFormatted,
-    estado: '4', // Siempre 4 = Atendido
-    sis: sis.toString(),
-    page: page.toString(),
-    size: size.toString()
-  })
+  // Si se provee array de especialidades, usar especialidadSolicitudArray
+  // (parámetros repetidos). Si no, caer al parámetro singular.
+  const especialidadesValidas = (especialidades || [])
+    .filter(e => e && e.trim() !== "" && e !== "todos")
+    .map(e => e.padStart(4, "0"))
+
+  if (especialidadesValidas.length > 0) {
+    for (const esp of especialidadesValidas) {
+      parts.push(`especialidadSolicitudArray=${encodeURIComponent(esp)}`)
+    }
+  } else if (especialidad && especialidad !== "todos") {
+    parts.push(`especialidadSolicitud=${encodeURIComponent(especialidad.padStart(4, "0"))}`)
+  }
 
   // Agregar parámetros opcionales si existen
   if (medico && medico !== "todos") {
-    queryParams.append("medico", medico)
+    parts.push(`medico=${encodeURIComponent(medico)}`)
   }
   if (turnoConsulta && turnoConsulta !== "TODOS") {
-    queryParams.append("turnoConsulta", turnoConsulta)
+    parts.push(`turnoConsulta=${encodeURIComponent(turnoConsulta)}`)
   }
   if (estadoAuditoria && estadoAuditoria !== "todos") {
     // Convertir el estado string a número para el API
     const estadoNum = getEstadoNumero(estadoAuditoria)
-    queryParams.append("estadoAuditoria", estadoNum.toString())
+    parts.push(`estadoAuditoria=${estadoNum.toString()}`)
   }
 
-  const url = `${API_CITAS_URL}/cita/buscar?${queryParams.toString()}`
+  const url = `${API_CITAS_URL}/cita-auditoria/buscar?${parts.join("&")}`
+  console.log("[buscarCitas] (vista auditoría) especialidades:", especialidadesValidas, "URL:", url)
 
   try {
     const response = await fetch(url, {
@@ -526,6 +542,109 @@ export async function eliminarItemLiquidacion(cuentaId: number, item: string, or
     }
   } catch (error) {
     console.error("Error en eliminarItemLiquidacion:", error)
+    throw error
+  }
+}
+
+/**
+ * Obtiene el ID de cita a partir del número de atención (FUA)
+ * Usa el endpoint: /api/seguros/atenciones/cita-id?numatencion=XXX
+ */
+export async function obtenerCitaIdPorNumAtencion(numatencion: string): Promise<string> {
+  const url = `${API_CITAS_URL}/seguros/atenciones/cita-id?numatencion=${encodeURIComponent(numatencion)}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "*/*"
+      }
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`No se encontró una cita para el FUA ${numatencion}`)
+      }
+      throw new Error(`Error al obtener cita ID por numatencion: ${response.status} ${response.statusText}`)
+    }
+
+    const text = await response.text()
+    const citaId = text.trim()
+    if (!citaId) {
+      throw new Error(`No se encontró una cita para el FUA ${numatencion}`)
+    }
+    return citaId
+  } catch (error) {
+    console.error("Error en obtenerCitaIdPorNumAtencion:", error)
+    throw error
+  }
+}
+
+/**
+ * Busca una cita por idcita usando query param (vista auditoría)
+ * Usa el endpoint: /api/cita-auditoria/buscar/idcita?idcita=XXX
+ *
+ * Normaliza la respuesta de la nueva vista (camelCase con campos
+ * pacienteId, pacienteNombre, numeroFua, numeroHistoria, auditorNombre, etc.)
+ * manteniendo los campos legacy para compatibilidad con el resto del código.
+ */
+export async function buscarCitaPorIdQuery(idcita: string): Promise<Cita> {
+  const url = `${API_CITAS_URL}/cita-auditoria/buscar/idcita?idcita=${encodeURIComponent(idcita)}`
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "accept": "application/json"
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error al buscar cita por idcita: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
+    // Mapear/normalizar al shape Cita usado en todo el frontend.
+    // Se conservan los nombres nuevos y además se exponen aliases legacy
+    // (paciente, nombre, historia, numAtencion, medico, consultorio, especialidad)
+    // para no romper componentes que aún leen los antiguos.
+    const normalized: Cita = {
+      ...data,
+      // IDs
+      citaId: data.citaId,
+      paciente: data.pacienteId?.toString().trim() ?? data.paciente ?? "",
+      pacienteId: data.pacienteId?.toString().trim() ?? data.pacienteId,
+      medico: data.medicoId?.toString().trim() ?? data.medico ?? "",
+      consultorio: data.consultorioId?.toString().trim() ?? data.consultorio ?? "",
+      especialidad: data.especialidadId?.toString().trim() ?? data.especialidad,
+      // Nombres
+      nombre: data.pacienteNombre?.toString().trim() ?? data.nombre ?? "",
+      medicoNombre: data.medicoNombre?.toString().trim() ?? "",
+      consultorioNombre: data.consultorioNombre?.toString().trim() ?? "",
+      // Datos de cita
+      fecha: data.fecha,
+      hora: data.hora?.toString().trim(),
+      estado: data.estado?.toString() ?? "",
+      estadoAuditoria: data.estadoAuditoria?.toString() || "1",
+      // FUA / Historia
+      numAtencion: data.numeroFua?.toString().trim() ?? data.numAtencion,
+      numeroFua: data.numeroFua?.toString().trim() ?? data.numeroFua,
+      historia: data.numeroHistoria?.toString().trim() ?? data.historia,
+      numeroHistoria: data.numeroHistoria?.toString().trim() ?? data.numeroHistoria,
+      // Auditor: la nueva API entrega un único string concatenado.
+      // Lo colocamos en auditorNombres para que la concatenación posterior
+      // (apepaterno + apematerno + nombres) siga mostrándolo correctamente.
+      auditorNombres: data.auditorNombre ?? data.auditorNombres ?? null,
+      auditorApepaterno: data.auditorApepaterno ?? null,
+      auditorApematerno: data.auditorApematerno ?? null,
+      // Firmado
+      firmado: !!data.firmado,
+    }
+
+    return normalized
+  } catch (error) {
+    console.error("Error en buscarCitaPorIdQuery:", error)
     throw error
   }
 }

@@ -1,14 +1,13 @@
-﻿import { useState, useEffect } from "react"
+﻿import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye } from "lucide-react"
-// import { Trash2 } from "lucide-react" // Comentado junto con acciones de eliminar
 import { obtenerCitaIdPorAtencion } from "@/services/citaService"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
-// import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService" // Comentado junto con acciones de eliminar
-// import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog" // Comentado junto con acciones de eliminar
-// import { extractDocumentFromToken } from "@/utils/jwtUtils" // Comentado junto con acciones de eliminar
+// import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService"
+// import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+// import { extractDocumentFromToken } from "@/utils/jwtUtils"
 import { EstadoPaqueteSelector } from "@/components/selectors/EstadoPaqueteSelector"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import {
@@ -101,6 +100,10 @@ export default function PackagesPage() {
     }
   }
 
+  // Mapa de especialidad id → nombre
+  const [especialidadMap, setEspecialidadMap] = useState<Record<string, string>>({})
+  const hasFetchedEsp = useRef(false)
+
   const [estado, setEstado] = useState<string>("todos")
   const [numeroPaquete, setNumeroPaquete] = useState<string>("")
   const [paqueteSeleccionado, setPaqueteSeleccionado] = useState<Paquete | null>(null)
@@ -118,12 +121,12 @@ export default function PackagesPage() {
   const [mostrarVerificacion, setMostrarVerificacion] = useState(false)
   const [errorVerificacion, setErrorVerificacion] = useState<string | null>(null)
 
-  // Estados para eliminar paquete - comentados junto con acciones de eliminar
+  // Estados para eliminar paquete - COMENTADO
   // const [showDeletePaqueteDialog, setShowDeletePaqueteDialog] = useState(false)
   // const [paqueteAEliminar, setPaqueteAEliminar] = useState<Paquete | null>(null)
   // const [loadingDeletePaquete, setLoadingDeletePaquete] = useState(false)
 
-  // Estados para eliminar atención individual - comentados junto con acciones de eliminar
+  // Estados para eliminar atención individual - COMENTADO
   // const [showDeleteAtencionDialog, setShowDeleteAtencionDialog] = useState(false)
   // const [atencionAEliminar, setAtencionAEliminar] = useState<DetallePaquete | null>(null)
   // const [loadingDeleteAtencion, setLoadingDeleteAtencion] = useState(false)
@@ -221,6 +224,29 @@ export default function PackagesPage() {
     }
   }
 
+  // Fetch especialidades para mapear id → nombre
+  useEffect(() => {
+    if (hasFetchedEsp.current) return
+    hasFetchedEsp.current = true
+    const fetchEspecialidades = async () => {
+      try {
+        const response = await fetch(`${API_INTEROP_URL}/especialidad`)
+        const result = await response.json()
+        if (result.success && result.data) {
+          const map: Record<string, string> = {}
+          result.data.forEach((esp: { id: string; descripcion: string; idEspecialidadSgh: string }) => {
+            map[esp.id] = esp.descripcion
+            map[esp.idEspecialidadSgh] = esp.descripcion
+          })
+          setEspecialidadMap(map)
+        }
+      } catch (err) {
+        console.error("Error fetching especialidades:", err)
+      }
+    }
+    fetchEspecialidades()
+  }, [])
+
   // Load paquetes on mount and when filters change
   useEffect(() => {
     fetchPaquetes()
@@ -258,54 +284,53 @@ export default function PackagesPage() {
     fetchPaquetes()
   }
 
-  // Eliminar paquete completo - comentado junto con acciones de eliminar
-  /*
-  const handleConfirmDeletePaquete = async () => {
-    if (!paqueteAEliminar) return
-    const usuario = extractDocumentFromToken()
-    if (!usuario) {
-      alert("No se pudo obtener el usuario actual. Por favor, inicie sesión nuevamente.")
-      return
-    }
-    setLoadingDeletePaquete(true)
-    try {
-      await eliminarPaqueteSis(paqueteAEliminar.codigoPaqueteSis, usuario)
-      setShowDeletePaqueteDialog(false)
-      setPaqueteAEliminar(null)
-      if (paqueteSeleccionado?.idPaqueteSis === paqueteAEliminar.idPaqueteSis) {
-        setPaqueteSeleccionado(null)
-        setDetallesPaquete([])
-      }
-      fetchPaquetes()
-    } catch (err) {
-      console.error("Error al eliminar paquete:", err)
-      alert("Error al eliminar el paquete. Por favor, inténtelo de nuevo.")
-    } finally {
-      setLoadingDeletePaquete(false)
-    }
-  }
-  */
+  // Eliminar paquete completo - COMENTADO
+  // const handleConfirmDeletePaquete = async () => {
+  //   if (!paqueteAEliminar) return
+  //   const usuario = extractDocumentFromToken()
+  //   if (!usuario) {
+  //     alert("No se pudo obtener el usuario actual. Por favor, inicie sesión nuevamente.")
+  //     setLoadingDeletePaquete(false)
+  //     return
+  //   }
+  //   setLoadingDeletePaquete(true)
+  //   try {
+  //     await eliminarPaqueteSis(paqueteAEliminar.codigoPaqueteSis, usuario)
+  //     setShowDeletePaqueteDialog(false)
+  //     setPaqueteAEliminar(null)
+  //     if (paqueteSeleccionado?.idPaqueteSis === paqueteAEliminar.idPaqueteSis) {
+  //       setPaqueteSeleccionado(null)
+  //       setDetallesPaquete([])
+  //     }
+  //     fetchPaquetes()
+  //     alert("Paquete eliminado exitosamente del SIS")
+  //   } catch (error) {
+  //     console.error("Error al eliminar paquete:", error)
+  //     alert("Error al eliminar el paquete. Por favor intente nuevamente.")
+  //   } finally {
+  //     setLoadingDeletePaquete(false)
+  //   }
+  // }
 
-  // Eliminar atención individual - comentado junto con acciones de eliminar
-  /*
-  const handleConfirmDeleteAtencion = async () => {
-    if (!atencionAEliminar) return
-    setLoadingDeleteAtencion(true)
-    try {
-      await eliminarAtencionSis(atencionAEliminar.idAtencion)
-      setShowDeleteAtencionDialog(false)
-      setAtencionAEliminar(null)
-      if (paqueteSeleccionado) {
-        fetchDetallesPaquete(paqueteSeleccionado.idPaqueteSis)
-      }
-    } catch (err) {
-      console.error("Error al eliminar atención:", err)
-      alert("Error al eliminar la atención. Por favor, inténtelo de nuevo.")
-    } finally {
-      setLoadingDeleteAtencion(false)
-    }
-  }
-  */
+  // Eliminar atención individual - COMENTADO
+  // const handleConfirmDeleteAtencion = async () => {
+  //   if (!atencionAEliminar) return
+  //   setLoadingDeleteAtencion(true)
+  //   try {
+  //     await eliminarAtencionSis(atencionAEliminar.idAtencion)
+  //     setShowDeleteAtencionDialog(false)
+  //     setAtencionAEliminar(null)
+  //     if (paqueteSeleccionado) {
+  //       fetchDetallesPaquete(paqueteSeleccionado.idPaqueteSis)
+  //     }
+  //     alert("Atención eliminada exitosamente del SIS")
+  //   } catch (error) {
+  //     console.error("Error al eliminar atención:", error)
+  //     alert("Error al eliminar la atención. Por favor intente nuevamente.")
+  //   } finally {
+  //     setLoadingDeleteAtencion(false)
+  //   }
+  // }
 
   const handleLimpiarFiltros = () => {
     setEstado("todos")
@@ -386,6 +411,7 @@ export default function PackagesPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Creación</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Periodo</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
+                        {/* <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th> */}
                       </tr>
                     </thead>
                     <tbody>
@@ -434,9 +460,8 @@ export default function PackagesPage() {
                             <td className="px-4 py-3 text-xs text-gray-600">
                               {paquete.fechaInicio} — {paquete.fechaFin}
                             </td>
-                            <td className="px-4 py-3 text-sm">{paquete.especialidad}</td>
-                            {/* Botón eliminar paquete - comentado por ahora
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-4 py-3 text-sm">{especialidadMap[paquete.especialidad] || paquete.especialidad}</td>
+                            {/* <td className="px-4 py-3 text-center">
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -451,8 +476,7 @@ export default function PackagesPage() {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
-                            </td>
-                            */}
+                            </td> */}
                           </tr>
                         ))
                       )}
@@ -600,8 +624,7 @@ export default function PackagesPage() {
                                     )}
                                     Ver
                                   </Button>
-                                  {/* Botón eliminar atención - comentado por ahora
-                                  <Button
+                                  {/* <Button
                                     size="sm"
                                     onClick={() => {
                                       setAtencionAEliminar(detalle)
@@ -616,8 +639,7 @@ export default function PackagesPage() {
                                       <Trash2 className="w-3 h-3 mr-1" />
                                     )}
                                     Eliminar
-                                  </Button>
-                                  */}
+                                  </Button> */}
                                 </div>
                               </td>
                             </tr>
@@ -830,8 +852,8 @@ export default function PackagesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de confirmación para eliminar paquete - comentado por ahora
-      <AlertDialog open={showDeletePaqueteDialog} onOpenChange={setShowDeletePaqueteDialog}>
+      {/* Dialog de confirmación para eliminar paquete - COMENTADO */}
+      {/* <AlertDialog open={showDeletePaqueteDialog} onOpenChange={setShowDeletePaqueteDialog}>
         <AlertDialogContent className="border-red-200 shadow-xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-lg font-semibold text-red-700 flex items-center gap-2">
@@ -859,11 +881,10 @@ export default function PackagesPage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-      */}
+      </AlertDialog> */}
 
-      {/* Dialog de confirmación para eliminar atención - comentado por ahora
-      <AlertDialog open={showDeleteAtencionDialog} onOpenChange={setShowDeleteAtencionDialog}>
+      {/* Dialog de confirmación para eliminar atención - COMENTADO */}
+      {/* <AlertDialog open={showDeleteAtencionDialog} onOpenChange={setShowDeleteAtencionDialog}>
         <AlertDialogContent className="border-red-200 shadow-xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-lg font-semibold text-red-700 flex items-center gap-2">
@@ -891,8 +912,7 @@ export default function PackagesPage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-      */}
+      </AlertDialog> */}
 
       {/* Modal de Revisión de FUA */}
       {modalDetalle && (

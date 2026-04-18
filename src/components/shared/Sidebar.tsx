@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { ShieldCheck, Layers, Package } from "lucide-react"
+import { ShieldCheck, Layers, Package, FileBarChart } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
@@ -18,6 +18,11 @@ export function Sidebar() {
       title: "Paquetes",
       url: "/packages",
       icon: Package,
+    },
+    {
+      title: "Reportes",
+      url: "/report",
+      icon: FileBarChart,
     },
   ]
 

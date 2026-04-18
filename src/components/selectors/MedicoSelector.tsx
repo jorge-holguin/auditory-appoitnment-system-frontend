@@ -54,7 +54,7 @@ export function MedicoSelector({
   label = "Médico",
   fechaInicio,
   fechaFin,
-  idEspecialidadSolicitud = "0001"
+  idEspecialidadSolicitud = "1091"
 }: MedicoSelectorProps) {
   const [medicos, setMedicos] = useState<Medico[]>([])
   const [loading, setLoading] = useState(false)

@@ -24,7 +24,8 @@ export interface ListarFuasParams {
   fechaFinal: string   // formato DD-MM-YYYY
   idOrigen: string
   idEstado: number
-  idEspecialidad?: string
+  idEspecialidades?: string[]        // forma nueva (preferida): array de IDs
+  idEspecialidad?: string | string[] // legacy: acepta string único o array por compat con código viejo
   turnoConsulta?: string // M = Mañana, T = Tarde
   firmado?: string // FIRMADO, NO_FIRMADO, TODOS
   usuarioAuditoria?: string // DNI del auditor
@@ -40,37 +41,75 @@ export interface DescargarZipRequest {
 }
 
 /**
- * Lista FUAs con los filtros especificados
+ * Normaliza cualquier entrada de especialidades a un array limpio de strings únicos.
+ * Acepta: string, string[], undefined, null.
+ */
+function normalizeEspecialidades(
+  idEspecialidades?: string[],
+  idEspecialidad?: string | string[]
+): string[] {
+  const resultado: string[] = []
+
+  const push = (valor: unknown) => {
+    if (typeof valor === "string" && valor.trim() !== "" && !resultado.includes(valor)) {
+      resultado.push(valor.trim())
+    }
+  }
+
+  if (Array.isArray(idEspecialidades)) {
+    idEspecialidades.forEach(push)
+  }
+  if (Array.isArray(idEspecialidad)) {
+    idEspecialidad.forEach(push)
+  } else {
+    push(idEspecialidad)
+  }
+
+  return resultado
+}
+
+/**
+ * Lista FUAs con los filtros especificados.
+ * Acepta tanto `idEspecialidades` (array) como `idEspecialidad` (legacy) y normaliza
+ * para enviar siempre como `idEspecialidades=XXX&idEspecialidades=YYY` (parámetros repetidos).
  */
 export async function listarFuas(params: ListarFuasParams): Promise<Fua[]> {
-  const queryParams = new URLSearchParams({
-    fechaInicial: params.fechaInicial,
-    fechaFinal: params.fechaFinal,
-    idOrigen: params.idOrigen,
-    idEstado: params.idEstado.toString()
-  })
+  const especialidades = normalizeEspecialidades(params.idEspecialidades, params.idEspecialidad)
 
-  // Agregar especialidad solo si está definida y no es "todos"
-  if (params.idEspecialidad && params.idEspecialidad !== "todos") {
-    queryParams.append("idEspecialidad", params.idEspecialidad)
+  const parts: string[] = [
+    `fechaInicial=${encodeURIComponent(params.fechaInicial)}`,
+    `fechaFinal=${encodeURIComponent(params.fechaFinal)}`,
+    `idOrigen=${encodeURIComponent(params.idOrigen)}`,
+  ]
+
+  // idEspecialidades como parámetros repetidos: ?idEspecialidades=1091&idEspecialidades=0904
+  for (const esp of especialidades) {
+    parts.push(`idEspecialidades=${encodeURIComponent(esp)}`)
   }
 
-  // Agregar turno solo si está definido y no es "TODOS"
+  parts.push(`idEstado=${encodeURIComponent(params.idEstado.toString())}`)
+
   if (params.turnoConsulta && params.turnoConsulta !== "TODOS") {
-    queryParams.append("turnoConsulta", params.turnoConsulta)
+    parts.push(`turnoConsulta=${encodeURIComponent(params.turnoConsulta)}`)
   }
 
-  // Agregar filtro de firmado solo si está definido y no es "TODOS"
   if (params.firmado && params.firmado !== "TODOS") {
-    queryParams.append("firmado", params.firmado === "FIRMADO" ? "true" : "false")
+    parts.push(`firmado=${params.firmado === "FIRMADO" ? "true" : "false"}`)
   }
 
-  // Agregar filtro de auditor (DNI) si está definido
   if (params.usuarioAuditoria && params.usuarioAuditoria.trim() !== "") {
-    queryParams.append("usuarioAuditoria", params.usuarioAuditoria.trim())
+    parts.push(`usuarioAuditoria=${encodeURIComponent(params.usuarioAuditoria.trim())}`)
   }
 
-  const url = `${API_INTEROP_URL}/fua/listarFuas?${queryParams.toString()}`
+  const url = `${API_INTEROP_URL}/fua/listarFuas?${parts.join("&")}`
+
+  // DEBUG: log de normalización para verificar que siempre se envía correctamente
+  console.log("[listarFuas v5] params recibidos:", {
+    idEspecialidades: params.idEspecialidades,
+    idEspecialidad: params.idEspecialidad,
+  })
+  console.log("[listarFuas v5] especialidades normalizadas:", especialidades)
+  console.log("[listarFuas v5] URL final:", url)
 
   try {
     const response = await fetch(url, {

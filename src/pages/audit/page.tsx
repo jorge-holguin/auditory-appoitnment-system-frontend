@@ -4,16 +4,14 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { OrigenSelector } from "@/components/selectors/OrigenSelector"
-import { EspecialidadSimpleSelector } from "@/components/selectors/EspecialidadSimpleSelector"
+import { EspecialidadMultiSelector } from "@/components/selectors/EspecialidadMultiSelector"
 import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
-import { useCatalogos } from "@/contexts/CatalogosContext"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Check, X } from "lucide-react"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
-import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString } from "@/services/citaService"
+import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString, obtenerCitaIdPorNumAtencion, buscarCitaPorIdQuery } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import "@/styles/datepicker-custom.css"
@@ -35,11 +33,13 @@ const esCustom = {
 registerLocale('es', esCustom)
 
 export default function AuditPage() {
-  const { especialidades } = useCatalogos()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [origen, setOrigen] = useState("CE")
-  const [especialidad, setEspecialidad] = useState("todos")
-  const [estado, setEstado] = useState("PENDIENTE")
+  // Multi-selección de especialidades. Se llena automáticamente con todas al cargar (selectAllByDefault).
+  const [especialidadesSel, setEspecialidadesSel] = useState<string[]>([])
+  // Búsqueda por número de FUA: 00005947-YY-XXXXXXXX (siempre visible)
+  const [fuaAnio, setFuaAnio] = useState(new Date().getFullYear().toString().slice(-2))
+  const [fuaNumero, setFuaNumero] = useState("")
+  const [estado, setEstado] = useState("PENDIENTE") // estadoAuditoria=1
   const [medico, setMedico] = useState("todos")
   const [turno, setTurno] = useState<"M" | "T" | "TODOS">("TODOS")
   const [citaId, setCitaId] = useState(searchParams.get("citaId") || "")
@@ -102,6 +102,42 @@ export default function AuditPage() {
     }
   }
 
+  // Función para buscar cita por Número de FUA
+  // Compone numatencion = prefijo(00005947) + año(YY) + número(8 dígitos)
+  // Ejemplo: 00005947 + 26 + 00055107 = 000059472600055107
+  const buscarPorFua = async () => {
+    if (!fuaNumero.trim()) {
+      setError("Por favor ingrese un número de FUA")
+      return
+    }
+
+    const numatencion = `00005947${fuaAnio}${fuaNumero.padStart(8, "0")}`
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // 1) Obtener citaId desde numatencion
+      const citaIdFromFua = await obtenerCitaIdPorNumAtencion(numatencion)
+      // 2) Buscar la cita por idcita
+      const cita = await buscarCitaPorIdQuery(citaIdFromFua)
+      setAtenciones([cita])
+      setPagination({
+        page: 0,
+        size: 1,
+        totalPages: 1,
+        totalElements: 1
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al buscar el FUA")
+      console.error("Error al buscar por FUA:", err)
+      setAtenciones([])
+      setPagination({ page: 0, size: 20, totalPages: 0, totalElements: 0 })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Función para cargar citas desde la API
   const cargarCitas = async (page: number = 0) => {
     // Si hay un ID de cita, buscar por ID en lugar de filtros
@@ -110,13 +146,18 @@ export default function AuditPage() {
       return
     }
 
+    // Si hay un número de FUA escrito, no cargar por filtros (tiene su propio botón Buscar)
+    if (fuaNumero.trim()) {
+      return
+    }
+
     if (!selectedDate) {
       setError("Por favor seleccione una fecha")
       return
     }
 
-    // No cargar si no hay especialidad seleccionada
-    if (especialidad === "todos") {
+    // No cargar si no hay especialidades seleccionadas
+    if (especialidadesSel.length === 0) {
       setAtenciones([])
       setPagination({
         page: 0,
@@ -131,18 +172,16 @@ export default function AuditPage() {
     setError(null)
 
     try {
-      // Usar el idEspecialidadSgh (código SGH) si está disponible en el catálogo
-      const especialidadCatalogo = especialidades.find(e => e.id === especialidad)
-      const especialidadApi = especialidadCatalogo?.idEspecialidadSgh || especialidad
-
+      // EspecialidadMultiSelector devuelve códigos SGH directamente (idEspecialidadSgh)
+      // Se envían como especialidadSolicitudArray (parámetros repetidos)
       const response: CitaResponse = await buscarCitas({
         desde: selectedDate,
         hasta: selectedDate,
-        // Para el API se debe usar el código SGH (idEspecialidadSgh), por ejemplo 0031 para Anestesiología
-        especialidad: especialidad !== "todos" ? especialidadApi : undefined,
+        especialidades: especialidadesSel,
         medico: medico !== "todos" ? medico : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
         estadoAuditoria: estado !== "todos" ? estado : undefined,
+        sis: true,
         page,
         size: 20 // Siempre usar tamaño de página por defecto
       })
@@ -172,15 +211,16 @@ export default function AuditPage() {
       cargarCitas(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, especialidad, medico, turno, estado, citaId])
+  }, [selectedDate, especialidadesSel, medico, turno, estado, citaId])
 
   const handleActualizar = () => {
     cargarCitas(pagination.page)
   }
 
   const handleLimpiarFiltros = () => {
-    setOrigen("CE")
-    setEspecialidad("todos")
+    setEspecialidadesSel([]) // Se llenará automáticamente con todas al cargar (selectAllByDefault)
+    setFuaAnio(new Date().getFullYear().toString().slice(-2))
+    setFuaNumero("")
     setMedico("todos")
     setTurno("TODOS")
     setEstado("PENDIENTE")
@@ -361,9 +401,42 @@ export default function AuditPage() {
               />
             </div>
             
-            {/* Fila 1 - Columna 2: Origen */}
-            <div className="relative z-10">
-              <OrigenSelector value={origen} onChange={setOrigen} />
+            {/* Fila 1 - Columna 2: Búsqueda por N° FUA (siempre visible) */}
+            <div>
+              <label className="block text-sm font-medium text-[#114C5F] mb-2">
+                Buscar por N° FUA
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-mono text-[#114C5F] bg-gray-100 px-2 py-1.5 rounded-l-md border border-r-0 border-[#9CD2D3] h-[38px] flex items-center">00005947</span>
+                <span className="text-sm text-gray-400 flex items-center">-</span>
+                <select
+                  value={fuaAnio}
+                  onChange={(e) => setFuaAnio(e.target.value)}
+                  className="w-16 text-sm font-mono px-1 py-1.5 border border-[#9CD2D3] rounded-md h-[38px] text-[#114C5F] focus:ring-2 focus:ring-[#4F9BB6]"
+                >
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const y = new Date().getFullYear() - 2 + i
+                    return <option key={y} value={y.toString().slice(-2)}>{y.toString().slice(-2)}</option>
+                  })}
+                </select>
+                <span className="text-sm text-gray-400 flex items-center">-</span>
+                <input
+                  type="text"
+                  value={fuaNumero}
+                  onChange={(e) => setFuaNumero(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  onKeyDown={(e) => e.key === 'Enter' && buscarPorFua()}
+                  placeholder="00048104"
+                  className="w-28 text-sm font-mono px-2 py-1.5 border border-[#9CD2D3] rounded-md h-[38px] text-[#114C5F] focus:ring-2 focus:ring-[#4F9BB6]"
+                  maxLength={8}
+                />
+                <Button
+                  onClick={buscarPorFua}
+                  disabled={!fuaNumero.trim() || loading}
+                  className="ml-2 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white shadow-sm h-[38px] px-4"
+                >
+                  Buscar
+                </Button>
+              </div>
             </div>
 
        {/* Fila 2 - Columna 1: Turno */}
@@ -371,12 +444,13 @@ export default function AuditPage() {
             <TurnoSelector value={turno} onChange={setTurno} />
           </div>
 
-            {/* Fila 2 - Columna 2: Especialidad */}
+            {/* Fila 2 - Columna 2: Especialidades (multi-selección) */}
             <div className="relative z-40">
-              <EspecialidadSimpleSelector 
-                value={especialidad} 
-                onChange={setEspecialidad}
-                label="Especialidad"
+              <EspecialidadMultiSelector
+                value={especialidadesSel}
+                onChange={setEspecialidadesSel}
+                label="Especialidades"
+                selectAllByDefault
               />
             </div>
 
@@ -387,7 +461,7 @@ export default function AuditPage() {
                 onChange={setMedico}
                 fechaInicio={selectedDate}
                 fechaFin={selectedDate}
-                idEspecialidadSolicitud={especialidad !== "todos" ? especialidad : "0001"}
+                idEspecialidadSolicitud={especialidadesSel[0] || "1091"}
               />
             </div>}
 
@@ -403,7 +477,7 @@ export default function AuditPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gradient-to-r from-[#4F9BB6]/10 to-[#9CD2D3]/10 border-b border-[#9CD2D3]/30">
-                <TableHead className="font-semibold text-[#114C5F]">CITA ID</TableHead>
+                <TableHead className="font-semibold text-[#114C5F]">N° FUA</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">PACIENTE</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">HISTORIA</TableHead>
                 <TableHead className="font-semibold text-[#114C5F]">CONSULTORIO</TableHead>
@@ -438,10 +512,10 @@ export default function AuditPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : atenciones.length === 0 && especialidad === "todos" && !citaId.trim() ? (
+              ) : atenciones.length === 0 && especialidadesSel.length === 0 && !citaId.trim() ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-12">
-                    <p className="text-gray-500">Por favor seleccione una especialidad para ver las atenciones</p>
+                    <p className="text-gray-500">Por favor seleccione al menos una especialidad para ver las atenciones</p>
                   </TableCell>
                 </TableRow>
               ) : atenciones.length === 0 ? (
@@ -452,14 +526,14 @@ export default function AuditPage() {
                 </TableRow>
               ) : atenciones.map((atencion, index) => (
                 <TableRow key={`${atencion.citaId}-${index}`}>
-                  <TableCell className="font-medium">{atencion.citaId}</TableCell>
+                  <TableCell className="font-mono text-sm">{atencion.numAtencion?.toString().trim() || atencion.numeroFua?.toString().trim() || atencion.citaId}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium">{atencion.nombre}</span>
-                      <span className="text-xs text-gray-500">{atencion.paciente}</span>
+                      <span className="font-medium">{atencion.pacienteNombre || atencion.nombre}</span>
+                      <span className="text-xs text-gray-500">{atencion.pacienteId || atencion.paciente}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{atencion.historia}</TableCell>
+                  <TableCell className="font-medium">{atencion.numeroHistoria?.trim() || atencion.historia || '—'}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{atencion.consultorioNombre}</span>
@@ -607,7 +681,7 @@ export default function AuditPage() {
             consultorioNombre: selectedCita.consultorioNombre,
             medicoNombre: selectedCita.medicoNombre,
             seguroNombre: selectedCita.seguroNombre,
-            historia: selectedCita.historia,
+            historia: selectedCita.historia || selectedCita.numeroHistoria || '',
             seguro: selectedCita.seguro,
             numRef: selectedCita.numRef,
             entidadSis: selectedCita.entidadSis
