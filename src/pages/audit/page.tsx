@@ -8,10 +8,12 @@ import { EspecialidadMultiSelector } from "@/components/selectors/EspecialidadMu
 import { EstadoSelector } from "@/components/selectors/EstadoSelector"
 import { MedicoSelector } from "@/components/selectors/MedicoSelector"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Check, X } from "lucide-react"
+import { RefreshCw, FilterX, Eye, RotateCcw, Loader2, Check, X, FileText, FileSignature, Receipt, Stethoscope } from "lucide-react"
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
-import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, buscarCitaPorId, getEstadoString, obtenerCitaIdPorNumAtencion, buscarCitaPorIdQuery } from "@/services/citaService"
+import { DocumentoFirmadoModal, type TipoDocumentoFirmado } from "@/components/modals/DocumentoFirmadoModal"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { buscarCitas, type Cita, type CitaResponse, marcarEnRevision, revertirCita, getEstadoString, obtenerCitaIdPorNumAtencion, buscarCitaPorIdQuery } from "@/services/citaService"
 import DatePicker, { registerLocale } from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import "@/styles/datepicker-custom.css"
@@ -74,6 +76,13 @@ export default function AuditPage() {
     totalElements: 0
   })
 
+  // Estado del modal de documentos firmados
+  const [docFirmadoModal, setDocFirmadoModal] = useState<{
+    open: boolean
+    idDocumento: string
+    idTipoDocumento: TipoDocumentoFirmado
+  }>({ open: false, idDocumento: "", idTipoDocumento: 9 })
+
   // Función para buscar cita por ID
   const buscarPorCitaId = async () => {
     if (!citaId.trim()) {
@@ -85,7 +94,8 @@ export default function AuditPage() {
     setError(null)
 
     try {
-      const cita = await buscarCitaPorId(citaId.trim())
+      // Usar endpoint de vista auditoría: /cita-auditoria/buscar/idcita?idcita=XXX
+      const cita = await buscarCitaPorIdQuery(citaId.trim())
       setAtenciones([cita])
       setPagination({
         page: 0,
@@ -174,11 +184,15 @@ export default function AuditPage() {
     try {
       // EspecialidadMultiSelector devuelve códigos SGH directamente (idEspecialidadSgh)
       // Se envían como especialidadSolicitudArray (parámetros repetidos)
+      // El filtro de médico sólo aplica cuando hay exactamente una especialidad
+      // seleccionada (el selector de médicos depende de una sola especialidad)
+      const medicoAplica = especialidadesSel.length === 1 && medico !== "todos"
+
       const response: CitaResponse = await buscarCitas({
         desde: selectedDate,
         hasta: selectedDate,
         especialidades: especialidadesSel,
-        medico: medico !== "todos" ? medico : undefined,
+        medico: medicoAplica ? medico : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
         estadoAuditoria: estado !== "todos" ? estado : undefined,
         sis: true,
@@ -201,6 +215,15 @@ export default function AuditPage() {
     }
   }
 
+  // Si la cantidad de especialidades deja de ser exactamente 1, el filtro
+  // de médico ya no aplica -> lo reseteamos a "todos"
+  useEffect(() => {
+    if (especialidadesSel.length !== 1 && medico !== "todos") {
+      setMedico("todos")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [especialidadesSel])
+
   // Cargar datos al montar el componente y cuando cambien los filtros
   useEffect(() => {
     if (citaId.trim()) {
@@ -215,6 +238,12 @@ export default function AuditPage() {
 
   const handleActualizar = () => {
     cargarCitas(pagination.page)
+  }
+
+  // Abrir modal para visualizar un documento firmado digitalmente.
+  // Tipos: 9 = Atención, 10 = FUA, 11 = Liquidación.
+  const descargarDocumentoFirmado = (idDocumento: string, idTipoDocumento: TipoDocumentoFirmado) => {
+    setDocFirmadoModal({ open: true, idDocumento, idTipoDocumento })
   }
 
   const handleLimpiarFiltros = () => {
@@ -454,16 +483,25 @@ export default function AuditPage() {
               />
             </div>
 
-            {/* Fila 3 - Columna 1: Médico */}
-            {<div className="relative z-30">
-              <MedicoSelector
-                value={medico}
-                onChange={setMedico}
-                fechaInicio={selectedDate}
-                fechaFin={selectedDate}
-                idEspecialidadSolicitud={especialidadesSel[0] || "1091"}
-              />
-            </div>}
+            {/* Fila 3 - Columna 1: Médico (solo disponible con UNA especialidad) */}
+            <div className="relative z-30">
+              {especialidadesSel.length === 1 ? (
+                <MedicoSelector
+                  value={medico}
+                  onChange={setMedico}
+                  fechaInicio={selectedDate}
+                  fechaFin={selectedDate}
+                  idEspecialidadSolicitud={especialidadesSel[0]}
+                />
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-[#114C5F] mb-1">Médico</label>
+                  <div className="h-10 px-3 flex items-center text-sm text-gray-500 bg-gray-100 border border-gray-200 rounded-md cursor-not-allowed">
+                    Seleccione una sola especialidad para filtrar por médico
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Fila 3 - Columna 2: Estado */}
             <div className="relative z-20">
@@ -581,6 +619,45 @@ export default function AuditPage() {
                         <Eye className="w-4 h-4 mr-1" />
                         Revisar
                       </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-[#114C5F] text-[#114C5F] hover:bg-[#114C5F]/10"
+                            disabled={!atencion.firmado}
+                            title={!atencion.firmado ? "La atención aún no ha sido firmada" : "Ver documentos firmados"}
+                          >
+                            <FileText className="w-4 h-4 mr-1" />
+                            Ver documentos
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 bg-white border border-gray-200 shadow-lg">
+                          <DropdownMenuLabel className="text-[#114C5F]">Documentos firmados</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => descargarDocumentoFirmado(atencion.citaId, 9)}
+                            className="cursor-pointer"
+                          >
+                            <Stethoscope className="w-4 h-4 mr-2 text-[#4F9BB6]" />
+                            Atención
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => descargarDocumentoFirmado(atencion.citaId, 10)}
+                            className="cursor-pointer"
+                          >
+                            <FileSignature className="w-4 h-4 mr-2 text-[#4A6EB0]" />
+                            FUA
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => descargarDocumentoFirmado(atencion.citaId, 11)}
+                            className="cursor-pointer"
+                          >
+                            <Receipt className="w-4 h-4 mr-2 text-green-600" />
+                            Liquidación
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -692,6 +769,14 @@ export default function AuditPage() {
           onRefresh={() => cargarCitas(pagination.page)}
         />
       )}
+
+      {/* Modal visualizador de documentos firmados (Atención / FUA / Liquidación) */}
+      <DocumentoFirmadoModal
+        open={docFirmadoModal.open}
+        onClose={() => setDocFirmadoModal((prev) => ({ ...prev, open: false }))}
+        idDocumento={docFirmadoModal.idDocumento}
+        idTipoDocumento={docFirmadoModal.idTipoDocumento}
+      />
     </div>
   )
 }

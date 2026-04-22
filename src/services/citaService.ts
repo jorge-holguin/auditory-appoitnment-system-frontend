@@ -691,7 +691,8 @@ export async function deleteObservados(
   const requestBody = {
     documentos: [
       { idDocumento: citaId, idTipoDocumento: 9 },   // Atención
-      { idDocumento: citaId, idTipoDocumento: 10 }  // FUA
+      { idDocumento: citaId, idTipoDocumento: 10 },  // FUA
+      { idDocumento: citaId, idTipoDocumento: 11 }   // Liquidación
     ],
     observacion,
     usuarioElimina

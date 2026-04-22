@@ -148,6 +148,119 @@ export interface DescargarZipResponse {
   nombreArchivo: string
 }
 
+// ===== NUEVO FLUJO: /trama/procesar-lote =====
+// Reemplaza a descargarZip + enviarPaqueteAlSis. El backend expone un
+// procesamiento asíncrono con un idProceso que se consulta por polling.
+
+export interface ProcesarLoteRequest {
+  idsAtencion: string[]
+  fechaInicio: string // DD-MM-YYYY
+  fechaFin: string    // DD-MM-YYYY
+  crearPaqueteDb: boolean
+  especialidad: string
+  idPaqueteSis: string
+  subirASis: boolean
+  usuario: string // documento obtenido del JWT
+}
+
+export interface ProcesoEstadoResponse {
+  idProceso: string
+  estado: string            // PENDIENTE | EN_PROCESO | COMPLETADO | ERROR | etc.
+  mensaje: string | null
+  error: string | null
+  idPaqueteSis: string | null
+  numeroPaquete: string | null
+  nombreArchivo: string | null
+  etapaActual: string | null
+  porcentaje: number        // 0..100
+  totalIds: number
+  procesados: number
+  observados: number
+  listoParaDescargar: boolean
+  enviadoASis: boolean
+  // Campos opcionales que el backend puede incluir al completar
+  errores?: ErrorDetalle[]
+  detalleErrores?: ErrorDetalle[]
+}
+
+/**
+ * Inicia el procesamiento asíncrono de un lote de atenciones.
+ * Retorna un idProceso con el cual se consulta el avance.
+ */
+export async function procesarLote(request: ProcesarLoteRequest): Promise<ProcesoEstadoResponse> {
+  const url = `${API_INTEROP_URL}/trama/procesar-lote`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "accept": "*/*",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+
+  const text = await response.text()
+  let data: ProcesoEstadoResponse
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Respuesta inválida del servidor al iniciar proceso: ${text.substring(0, 200)}`)
+  }
+
+  if (!response.ok) {
+    const msg = data?.error || data?.mensaje || `HTTP ${response.status}`
+    throw new Error(`Error al iniciar procesamiento: ${msg}`)
+  }
+
+  return data
+}
+
+/**
+ * Consulta el estado/avance de un proceso de lote por su idProceso.
+ */
+export async function obtenerEstadoProceso(idProceso: string): Promise<ProcesoEstadoResponse> {
+  const url = `${API_INTEROP_URL}/trama/procesar-lote/${encodeURIComponent(idProceso)}`
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { "accept": "*/*" },
+  })
+
+  const text = await response.text()
+  let data: ProcesoEstadoResponse
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Respuesta inválida del servidor al consultar proceso: ${text.substring(0, 200)}`)
+  }
+
+  if (!response.ok) {
+    const msg = data?.error || data?.mensaje || `HTTP ${response.status}`
+    throw new Error(`Error al consultar estado del proceso: ${msg}`)
+  }
+
+  return data
+}
+
+/**
+ * Indica si un estado de proceso es terminal (no habrá más polling).
+ */
+export function esEstadoTerminal(estado: string | undefined): boolean {
+  if (!estado) return false
+  const e = estado.toUpperCase()
+  return (
+    e === "COMPLETADO" ||
+    e === "COMPLETED" ||
+    e === "FINALIZADO" ||
+    e === "TERMINADO" ||
+    e === "ERROR" ||
+    e === "FALLIDO" ||
+    e === "FAILED" ||
+    e === "OBSERVADO" ||
+    e === "CANCELADO"
+  )
+}
+
 /**
  * Descarga un archivo ZIP con las tramas de los FUAs seleccionados
  */

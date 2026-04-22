@@ -42,10 +42,13 @@ export function EstadoPaqueteSelector({ value, onChange, label = "Estado del Paq
     fetchEstados()
   }, [])
 
+  // El valor emitido es el `nombre` del estado en MAYÚSCULAS (ENVIADO, OBSERVADO,
+  // ELIMINADO, COMPLETADO, ...) que es exactamente lo que el backend espera en el
+  // query param `estado` del endpoint /paquete-sis.
   const options: ComboboxOption[] = [
     { value: "todos", label: "Todos" },
     ...estados.map(estado => ({
-      value: estado.id.toString(),
+      value: estado.nombre,
       label: estado.nombre
     }))
   ]

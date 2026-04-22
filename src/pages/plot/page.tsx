@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, FilterX, Download, Loader2, CheckCircle2, Upload, Package, AlertTriangle, Check, X, Eye } from "lucide-react"
+import { RefreshCw, FilterX, Download, Loader2, CheckCircle2, Upload, AlertTriangle, Check, X, Eye, ClipboardCheck, ArrowRight } from "lucide-react"
 
 import { TurnoSelector } from "@/components/selectors/TurnoSelector"
 import { EspecialidadMultiSelector } from "@/components/selectors/EspecialidadMultiSelector"
@@ -24,7 +25,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { DateValue } from "@internationalized/date"
-import { listarFuas, descargarZip, descargarBlob, enviarPaqueteAlSis, actualizarEstadoPaqueteSis, type Fua, type DescargarZipRequest, type DescargarZipResponse, type ErrorDetalle } from "@/services/tramaService"
+import { listarFuas, descargarBlob, procesarLote, obtenerEstadoProceso, esEstadoTerminal, type Fua, type ProcesarLoteRequest, type ProcesoEstadoResponse, type ErrorDetalle } from "@/services/tramaService"
+import { Progress } from "@/components/ui/progress"
 import { obtenerCitaIdPorAtencion } from "@/services/citaService"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
 import { format } from "date-fns"
@@ -32,6 +34,8 @@ import { parseDate } from "@internationalized/date"
 
 
 export default function PlotPage() {
+  const navigate = useNavigate()
+
   // Estados para filtros
   const [especialidades, setEspecialidades] = useState<string[]>([]) // selector auto-completa con todas
   const [estado, setEstado] = useState<string>("3") // APROBADO por defecto
@@ -54,7 +58,7 @@ export default function PlotPage() {
   
   const [fuas, setFuas] = useState<Fua[]>([])
   const [loading, setLoading] = useState(false)
-  const [cargandoEnvioPaquete, setCargandoEnvioPaquete] = useState(false)
+  const [iniciandoProceso, setIniciandoProceso] = useState(false)
   const [pageSize, setPageSize] = useState<number>(25)
   const [currentPage, setCurrentPage] = useState<number>(0)
 
@@ -65,34 +69,43 @@ export default function PlotPage() {
   const [modalFua, setModalFua] = useState<Fua | null>(null)
   const [loadingVerAtencion, setLoadingVerAtencion] = useState<string | null>(null)
 
-  // Estados para el dialog de confirmación del paquete
-  const [showPackageDialog, setShowPackageDialog] = useState(false)
-  const [paqueteGenerado, setPaqueteGenerado] = useState<DescargarZipResponse | null>(null)
-  const [enviandoAlSis, setEnviandoAlSis] = useState(false)
-  
-  // Estados para el dialog de éxito
+  // ===== NUEVO FLUJO: /trama/procesar-lote =====
+  // Soporte para múltiples procesos concurrentes. Cada proceso se
+  // identifica por su idProceso y se consulta por polling cada 3s.
+  interface ProcesoActivo {
+    idProceso: string
+    estado: string
+    porcentaje: number
+    etapaActual: string | null
+    mensaje: string | null
+    error: string | null
+    totalIds: number
+    procesados: number
+    observados: number
+    nombreArchivo: string | null
+    numeroPaquete: string | null
+    listoParaDescargar: boolean
+    enviadoASis: boolean
+    // Metadatos locales
+    etiqueta: string // ej: "Especialidad X (15 atenciones)"
+    cantidadIds: number
+    iniciadoEn: number
+  }
+  const [procesosActivos, setProcesosActivos] = useState<ProcesoActivo[]>([])
+  // Cola de procesos terminados pendientes de mostrar en el dialog de resultado
+  const [colaResultados, setColaResultados] = useState<ProcesoEstadoResponse[]>([])
+  // Proceso actualmente mostrado en el dialog de resultado
+  const [resultadoActual, setResultadoActual] = useState<ProcesoEstadoResponse | null>(null)
+
+  // Estados para el dialog de resultado (éxito/error)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [generatedFileName, setGeneratedFileName] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [isErrorDialog, setIsErrorDialog] = useState(false)
-  
-  // Estados para el dialog de descarga
-  const [showDownloadDialog, setShowDownloadDialog] = useState(false)
-  
-  // Estados para errores detallados
   const [errorDetails, setErrorDetails] = useState<ErrorDetalle[] | null>(null)
 
   // Estado para dialog de advertencia OBSERVADO_SIS
   const [showObservadoSisWarning, setShowObservadoSisWarning] = useState(false)
-
-  // Función para extraer el correlativo del nombre del archivo
-  const obtenerCorrelativo = (nombreArchivo: string, longitud: number = 5): string => {
-    if (!nombreArchivo) return '0'
-    const sinExtension = nombreArchivo.replace(/\.zip$/i, '')
-    const ultimos = sinExtension.slice(-longitud)
-    // Convertir a número para eliminar ceros a la izquierda, luego a string
-    return Number(ultimos).toString()
-  }
 
   // Función para descargar errores como archivo TXT
   const handleDescargarErrores = () => {
@@ -127,6 +140,137 @@ export default function PlotPage() {
     cargarFuas()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [especialidades, estado, turno, soloFirmados, misAuditorias, dateRange])
+
+  // ===== Polling centralizado de procesos activos =====
+  // Un único intervalo cada 5s consulta en paralelo todos los procesos
+  // activos no-terminales. Esto escala bien incluso si el usuario lanza
+  // varios procesamientos simultáneos.
+  useEffect(() => {
+    // Sólo arrancar el intervalo si hay procesos no terminales
+    const hayNoTerminales = procesosActivos.some(p => !esEstadoTerminal(p.estado))
+    if (!hayNoTerminales) return
+
+    const intervalId = setInterval(async () => {
+      // Snapshot de ids no terminales en este tick
+      const idsParaConsultar = procesosActivos
+        .filter(p => !esEstadoTerminal(p.estado))
+        .map(p => p.idProceso)
+
+      if (idsParaConsultar.length === 0) return
+
+      // Consultas en paralelo, tolerantes a fallos individuales
+      const resultados = await Promise.all(
+        idsParaConsultar.map(async (id) => {
+          try {
+            const data = await obtenerEstadoProceso(id)
+            return { ok: true as const, id, data }
+          } catch (err) {
+            console.error(`[poll] error consultando proceso ${id}:`, err)
+            return { ok: false as const, id, error: err }
+          }
+        })
+      )
+
+      // Actualizar el estado de los procesos en un sólo setState
+      setProcesosActivos(prev =>
+        prev.map(p => {
+          const r = resultados.find(x => x.id === p.idProceso)
+          if (!r || !r.ok) return p
+          const d = r.data
+          return {
+            ...p,
+            estado: d.estado ?? p.estado,
+            porcentaje: d.porcentaje ?? p.porcentaje,
+            etapaActual: d.etapaActual ?? p.etapaActual,
+            mensaje: d.mensaje ?? p.mensaje,
+            error: d.error ?? p.error,
+            totalIds: d.totalIds ?? p.totalIds,
+            procesados: d.procesados ?? p.procesados,
+            observados: d.observados ?? p.observados,
+            nombreArchivo: d.nombreArchivo ?? p.nombreArchivo,
+            numeroPaquete: d.numeroPaquete ?? p.numeroPaquete,
+            listoParaDescargar: d.listoParaDescargar ?? p.listoParaDescargar,
+            enviadoASis: d.enviadoASis ?? p.enviadoASis,
+          }
+        })
+      )
+
+      // Encolar los que acaban de terminar
+      const terminados = resultados
+        .filter(r => r.ok && esEstadoTerminal(r.data.estado))
+        .map(r => (r as any).data as ProcesoEstadoResponse)
+
+      if (terminados.length > 0) {
+        setColaResultados(prev => [...prev, ...terminados])
+        // Refrescar la lista de FUAs al terminar
+        cargarFuas()
+      }
+    }, 3000)
+
+    return () => clearInterval(intervalId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [procesosActivos])
+
+  // Drena la cola de resultados hacia el dialog cuando no hay uno visible
+  useEffect(() => {
+    if (resultadoActual || colaResultados.length === 0) return
+
+    const siguiente = colaResultados[0]
+    setColaResultados(prev => prev.slice(1))
+    setResultadoActual(siguiente)
+
+    const errores = siguiente.errores || siguiente.detalleErrores || []
+    const estadoUpper = (siguiente.estado || "").toUpperCase()
+    const hayError = estadoUpper === "ERROR" || estadoUpper === "FALLIDO" || estadoUpper === "FAILED" || !!siguiente.error || errores.length > 0
+
+    setGeneratedFileName(siguiente.nombreArchivo || siguiente.numeroPaquete || siguiente.idProceso)
+    setIsErrorDialog(hayError)
+    setErrorDetails(errores.length > 0 ? errores : null)
+
+    if (hayError) {
+      const totalErr = errores.length
+      setSuccessMessage(
+        `${siguiente.mensaje || siguiente.error || "El proceso terminó con errores."}` +
+        (totalErr > 0 ? `\n\nSe detectaron errores en ${totalErr} registro(s).` : "")
+      )
+    } else {
+      setSuccessMessage(
+        `${siguiente.mensaje || "Proceso completado exitosamente."}\n\n` +
+        `Paquete: ${siguiente.nombreArchivo || siguiente.numeroPaquete || "-"}\n` +
+        `Procesados: ${siguiente.procesados ?? 0} / ${siguiente.totalIds ?? 0}` +
+        (siguiente.observados ? ` · Observados: ${siguiente.observados}` : "") +
+        (siguiente.enviadoASis ? `\n\nEl paquete fue enviado al SIS correctamente.` : "")
+      )
+    }
+
+    setShowSuccessDialog(true)
+
+    // Remover el proceso de la lista de activos
+    setProcesosActivos(prev => prev.filter(p => p.idProceso !== siguiente.idProceso))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colaResultados, resultadoActual])
+
+  // Limpiar resultadoActual cuando se cierra el dialog para permitir el siguiente
+  useEffect(() => {
+    if (!showSuccessDialog && resultadoActual) {
+      setResultadoActual(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccessDialog])
+
+  // Formatea fechaAtencion (viene como "2026-03-07 00:00:00.0" o ISO) a dd/mm/yyyy
+  const formatFechaAtencion = (fechaAtencion?: string): string => {
+    if (!fechaAtencion) return 'N/A'
+    try {
+      // Tomar solo la parte de la fecha para evitar problemas de zona horaria
+      const soloFecha = fechaAtencion.split(' ')[0].split('T')[0]
+      const [anio, mes, dia] = soloFecha.split('-')
+      if (!anio || !mes || !dia) return fechaAtencion
+      return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${anio}`
+    } catch {
+      return fechaAtencion
+    }
+  }
 
   const cargarFuas = async () => {
     if (!dateRange.start || !dateRange.end) {
@@ -206,8 +350,8 @@ export default function PlotPage() {
       return
     }
 
-    if (idsAtencion.length > 25) {
-      alert(`Puede seleccionar máximo 25 atenciones por paquete. Actualmente tiene ${idsAtencion.length} seleccionadas.`)
+    if (idsAtencion.length > 100) {
+      alert(`Puede seleccionar máximo 100 atenciones por paquete. Actualmente tiene ${idsAtencion.length} seleccionadas.`)
       return
     }
 
@@ -220,103 +364,75 @@ export default function PlotPage() {
     await ejecutarGenerarPaquete(idsAtencion)
   }
 
+  // Inicia un proceso asíncrono vía POST /trama/procesar-lote y lo agrega a la
+  // lista de procesos activos. El polling de progreso lo maneja un useEffect
+  // global más abajo que consulta todos los procesos no-terminales cada 5s.
   const ejecutarGenerarPaquete = async (idsAtencion?: string[]) => {
     if (!dateRange.start || !dateRange.end) return
 
     const ids = idsAtencion || obtenerIdsParaPaquete()
+    if (ids.length === 0) return
 
-    setCargandoEnvioPaquete(true)
-    try {
-      const fechaInicio = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
-      const fechaFin = format(new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day), "dd-MM-yyyy")
+    const fechaInicio = format(new Date(dateRange.start.year, dateRange.start.month - 1, dateRange.start.day), "dd-MM-yyyy")
+    const fechaFin = format(new Date(dateRange.end.year, dateRange.end.month - 1, dateRange.end.day), "dd-MM-yyyy")
 
-      // Obtener nombre de la especialidad
-      const especialidadNombre = fuas.find(f => f.id === ids[0])?.especialidad || "ESPECIALIDAD"
+    // Obtener nombre de la especialidad a partir del primer FUA seleccionado
+    const primerFua = fuas.find(f => f.id === ids[0])
+    const especialidadNombre = primerFua?.nombreEspecialidad || primerFua?.especialidad || "ESPECIALIDAD"
 
-      const request: DescargarZipRequest = {
-        idsAtencion: ids,
-        idPaqueteSis: "00004",
-        crearPaqueteDb: true,
-        fechaInicio,
-        fechaFin,
-        especialidad: especialidadNombre
-      }
-
-      const response = await descargarZip(request)
-      
-      // Guardar el paquete generado y mostrar el diálogo de confirmación
-      setPaqueteGenerado(response)
-      setShowPackageDialog(true)
-    } catch (error) {
-      console.error("Error al generar paquete:", error)
-      alert("Error al generar el paquete. Por favor intente nuevamente.")
-    } finally {
-      setCargandoEnvioPaquete(false)
+    // Usuario desde el JWT
+    const usuario = extractDocumentFromToken() || ""
+    if (!usuario) {
+      alert("No se pudo obtener el usuario autenticado. Por favor inicie sesión nuevamente.")
+      return
     }
-  }
 
-  const handleDescargarPaquete = () => {
-    if (!paqueteGenerado) return
-    
-    descargarBlob(paqueteGenerado.blob, paqueteGenerado.nombreArchivo)
-    // NO cerrar el diálogo para permitir también enviar al SIS
-    
-    // Mostrar diálogo de confirmación de descarga
-    setShowDownloadDialog(true)
-  }
+    const request: ProcesarLoteRequest = {
+      idsAtencion: ids,
+      fechaInicio,
+      fechaFin,
+      crearPaqueteDb: true,
+      especialidad: especialidadNombre,
+      idPaqueteSis: "00004",
+      subirASis: true,
+      usuario,
+    }
 
-  const handleEnviarAlSis = async () => {
-    if (!paqueteGenerado) return
-    
-    setEnviandoAlSis(true)
+    setIniciandoProceso(true)
     try {
-      // 1. Enviar el ZIP al SIS usando FormData
-      const respuestaSis = await enviarPaqueteAlSis(paqueteGenerado.blob, paqueteGenerado.nombreArchivo)
-      
-      // Cerrar el diálogo del paquete
-      setShowPackageDialog(false)
-      
-      // Mostrar diálogo de resultado con el mensaje del backend
-      setGeneratedFileName(paqueteGenerado.nombreArchivo)
-      
-      if (respuestaSis.estado === 'ok') {
-        // 2. Extraer el correlativo del nombre del archivo (últimos 5 dígitos sin ceros a la izquierda)
-        // Ejemplo: 0000594720251100036.zip -> 00036 -> 36
-        const idCorrelativo = obtenerCorrelativo(paqueteGenerado.nombreArchivo)
-        
-        // 3. Actualizar el estado del paquete a ENVIADO usando el correlativo
-        await actualizarEstadoPaqueteSis(idCorrelativo, 'ENVIADO')
-        
-        setIsErrorDialog(false)
-        setErrorDetails(null)
-        setSuccessMessage(`${respuestaSis.mensaje}\n\nEl paquete ${paqueteGenerado.nombreArchivo} (ID Correlativo: ${idCorrelativo}) fue procesado exitosamente y su estado ha sido actualizado a ENVIADO.`)
-        
-        // Refrescar la lista de FUAs ya que las atenciones enviadas cambian de estado
-        cargarFuas()
-        setSelectedFuas(new Set())
-      } else {
-        // Error del SIS con detalles
-        setIsErrorDialog(true)
-        setErrorDetails(respuestaSis.errores || null)
-        
-        const totalErrores = respuestaSis.errores?.length || 0
-        setSuccessMessage(`${respuestaSis.mensaje}\n\nSe detectaron errores en ${totalErrores} registro(s).`)
-      }
-      
-      setShowSuccessDialog(true)
-    } catch (error) {
-      console.error("Error al enviar paquete al SIS:", error)
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
+      const response = await procesarLote(request)
 
-      // Cerrar el diálogo del paquete y mostrar diálogo de error
-      setShowPackageDialog(false)
-      setGeneratedFileName(paqueteGenerado?.nombreArchivo || "")
-      setIsErrorDialog(true)
-      setErrorDetails(null)
-      setSuccessMessage(`Error al enviar el paquete al SIS:\n\n${errorMessage}\n\nPor favor intente nuevamente.`)
-      setShowSuccessDialog(true)
+      // Agregar a la lista de procesos activos (inmutable)
+      setProcesosActivos(prev => [
+        ...prev,
+        {
+          idProceso: response.idProceso,
+          estado: response.estado,
+          porcentaje: response.porcentaje ?? 0,
+          etapaActual: response.etapaActual,
+          mensaje: response.mensaje,
+          error: response.error,
+          totalIds: response.totalIds ?? ids.length,
+          procesados: response.procesados ?? 0,
+          observados: response.observados ?? 0,
+          nombreArchivo: response.nombreArchivo,
+          numeroPaquete: response.numeroPaquete,
+          listoParaDescargar: response.listoParaDescargar ?? false,
+          enviadoASis: response.enviadoASis ?? false,
+          etiqueta: `${especialidadNombre} · ${ids.length} atenciones`,
+          cantidadIds: ids.length,
+          iniciadoEn: Date.now(),
+        },
+      ])
+
+      // Limpiar selección: el usuario puede iniciar otro paquete en paralelo
+      setSelectedFuas(new Set())
+    } catch (error) {
+      console.error("Error al iniciar procesamiento de lote:", error)
+      const mensaje = error instanceof Error ? error.message : "Error desconocido"
+      alert(`No se pudo iniciar el procesamiento del lote.\n\n${mensaje}`)
     } finally {
-      setEnviandoAlSis(false)
+      setIniciandoProceso(false)
     }
   }
 
@@ -445,22 +561,29 @@ export default function PlotPage() {
               
               <Button 
                 onClick={handleGenerarPaquete}
-                disabled={cargandoEnvioPaquete || loading || fuasFiltradas.length === 0}
+                disabled={iniciandoProceso || loading || fuasFiltradas.length === 0 || procesosActivos.length > 0}
                 className="w-full h-10 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white font-medium disabled:opacity-50"
+                title={procesosActivos.length > 0 ? "Ya hay un proceso en curso para este usuario. Espere a que termine antes de iniciar otro." : undefined}
               >
-                {cargandoEnvioPaquete ? (
+                {iniciandoProceso ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generando...
+                    Iniciando proceso...
+                  </>
+                ) : procesosActivos.length > 0 ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Proceso en curso...
                   </>
                 ) : (
                   <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Generar Paquete
+                    <Upload className="w-4 h-4 mr-2" />
+                    Generar y Enviar Paquete
                   </>
                 )}
               </Button>
             </div>
+
           </div>
 
           {/* Tabla de FUAs */}
@@ -487,6 +610,7 @@ export default function PlotPage() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">N° FUA</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">HC</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paciente</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fecha Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Médico</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
@@ -498,14 +622,14 @@ export default function PlotPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Cargando FUAs...
                       </td>
                     </tr>
                   ) : fuasFiltradas.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         {especialidades.length === 0 
                           ? "Por favor seleccione una especialidad para ver las atenciones"
                           : "No se encontraron FUAs con los filtros seleccionados"}
@@ -540,6 +664,7 @@ export default function PlotPage() {
                         <td className="px-4 py-3 text-sm font-mono">{fua.numeroFua?.trim() || fua.id}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).historia?.trim() || (fua as any).hc || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).nombres?.trim() || (fua as any).paciente || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{formatFechaAtencion(fua.fechaAtencion)}</td>
                         <td className="px-4 py-3 text-sm">{fua.medico || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{(fua as any).tipoAtencion?.trim() || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">
@@ -672,92 +797,6 @@ export default function PlotPage() {
         </div>
       </div>
 
-      {/* Diálogo de confirmación del paquete */}
-      <Dialog open={showPackageDialog} onOpenChange={setShowPackageDialog}>
-        <DialogContent className="bg-white sm:max-w-lg">
-          <DialogHeader>
-            <div className="flex items-center justify-center mb-4">
-              <div className="rounded-full bg-blue-100 p-3">
-                <Package className="w-8 h-8 text-blue-600" />
-              </div>
-            </div>
-            <DialogTitle className="text-center text-xl">
-              Paquete Generado
-            </DialogTitle>
-            <DialogDescription className="text-center pt-2">
-              El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> ha sido generado exitosamente.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-3 mt-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">ID del Paquete</div>
-              <div className="font-mono text-lg font-semibold text-gray-900">{paqueteGenerado?.idPaquete}</div>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Nombre del archivo</div>
-              <div className="font-mono text-sm font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <Button
-              onClick={handleDescargarPaquete}
-              variant="outline"
-              className="flex-1 border-[#4F9BB6] text-[#4F9BB6] hover:bg-[#4F9BB6] hover:text-white"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Descargar
-            </Button>
-            <Button
-              onClick={handleEnviarAlSis}
-              disabled={enviandoAlSis}
-              className="flex-1 bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
-            >
-              {enviandoAlSis ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Enviar al SIS
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de confirmación de descarga */}
-      <Dialog open={showDownloadDialog} onOpenChange={setShowDownloadDialog}>
-        <DialogContent className="bg-white sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center justify-center mb-4">
-              <div className="rounded-full bg-green-100 p-3">
-                <Download className="w-8 h-8 text-green-600" />
-              </div>
-            </div>
-            <DialogTitle className="text-center text-xl">
-              Descarga Exitosa
-            </DialogTitle>
-            <DialogDescription className="text-center pt-2">
-              El paquete <span className="font-semibold text-gray-900">{paqueteGenerado?.nombreArchivo}</span> fue descargado exitosamente. Puede continuar y enviarlo al SIS si lo desea.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center mt-4">
-            <Button
-              onClick={() => setShowDownloadDialog(false)}
-              className="bg-[#4F9BB6] hover:bg-[#4A6EB0] text-white"
-            >
-              Aceptar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Dialog de resultado */}
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent className={`bg-white ${errorDetails && errorDetails.length > 0 ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}>
@@ -809,6 +848,38 @@ export default function PlotPage() {
             </div>
           )}
           
+          {/* Panel guía para completar el flujo (solo en éxito) */}
+          {!isErrorDialog && (
+            <div className="mt-4 border border-amber-300 bg-amber-50 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-amber-100 p-2 flex-shrink-0">
+                  <ClipboardCheck className="w-5 h-5 text-amber-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Siguiente paso: Verificar Reglas
+                  </p>
+                  <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                    Para que las atenciones pasen del estado <strong>ENVIADO</strong> a
+                    <strong> COMPLETADO</strong>, debe ir a
+                    <strong> Control de Paquetes</strong> y presionar el botón
+                    <strong> "Verificar Reglas"</strong> sobre este paquete.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowSuccessDialog(false)
+                      navigate("/packages")
+                    }}
+                    className="mt-3 bg-amber-600 hover:bg-amber-700 text-white h-9"
+                  >
+                    Ir a Control de Paquetes
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className={`flex ${errorDetails && errorDetails.length > 0 ? 'justify-between' : 'justify-center'} gap-3 mt-4`}>
             {errorDetails && errorDetails.length > 0 && (
               <Button
@@ -826,6 +897,75 @@ export default function PlotPage() {
             >
               Aceptar
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog modal de progreso: se muestra mientras haya procesos activos.
+          No permite cerrarse manualmente para evitar que el usuario lance
+          un segundo proceso mientras hay uno en curso. */}
+      <Dialog open={procesosActivos.length > 0}>
+        <DialogContent
+          className="bg-white sm:max-w-lg"
+          // Bloquear cierre por ESC, click fuera o botón X
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="rounded-full bg-blue-100 p-3">
+                <Loader2 className="w-8 h-8 text-[#4F9BB6] animate-spin" />
+              </div>
+            </div>
+            <DialogTitle className="text-center text-xl">
+              Procesando paquete
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              Por favor espere mientras se genera y envía el paquete al SIS.
+              No cierre esta ventana ni inicie otro proceso.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            {procesosActivos.map((p) => {
+              const porcentaje = Math.max(0, Math.min(100, p.porcentaje || 0))
+              const esError = (p.estado || "").toUpperCase() === "ERROR" || !!p.error
+              return (
+                <div
+                  key={p.idProceso}
+                  className={`border rounded-lg p-3 ${esError ? "border-red-300 bg-red-50" : "border-[#9CD2D3] bg-[#F7FBFC]"}`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[#114C5F] truncate" title={p.etiqueta}>
+                        {p.etiqueta}
+                      </p>
+                      <p className="text-xs text-gray-600 truncate">
+                        {p.etapaActual ? <>Etapa: <strong>{p.etapaActual}</strong> · </> : null}
+                        Estado: <strong>{p.estado}</strong>
+                      </p>
+                      <p className="text-[11px] text-gray-400 font-mono truncate mt-0.5">
+                        {p.idProceso}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-lg font-semibold ${esError ? "text-red-700" : "text-[#114C5F]"}`}>
+                        {porcentaje}%
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {p.procesados}/{p.totalIds}
+                        {p.observados > 0 ? ` · ${p.observados} obs.` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <Progress
+                    value={porcentaje}
+                    className={`h-2 ${esError ? "[&>div]:bg-red-500" : "[&>div]:bg-[#4F9BB6]"}`}
+                  />
+                </div>
+              )
+            })}
           </div>
         </DialogContent>
       </Dialog>

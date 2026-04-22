@@ -138,9 +138,24 @@ export default function PackagesPage() {
   const fetchPaquetes = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_INTEROP_URL}/paquete-sis?pagina=${paginaActual}&tamanio=${tamanio}`)
+
+      // Construir query params incluyendo filtros opcionales.
+      // estado: "ENVIADO" | "OBSERVADO" | "ELIMINADO" | "COMPLETADO" | etc.
+      // numeroPaquete: filtro parcial por código/nombre del paquete.
+      const params = new URLSearchParams({
+        pagina: paginaActual.toString(),
+        tamanio: tamanio.toString(),
+      })
+      if (estado && estado !== "todos") {
+        params.append("estado", estado)
+      }
+      if (numeroPaquete && numeroPaquete.trim() !== "") {
+        params.append("numeroPaquete", numeroPaquete.trim())
+      }
+
+      const response = await fetch(`${API_INTEROP_URL}/paquete-sis?${params.toString()}`)
       const result = await response.json()
-      
+
       if (result.content) {
         setPaquetes(result.content)
         setTotalPaginas(result.totalPages)
@@ -247,10 +262,24 @@ export default function PackagesPage() {
     fetchEspecialidades()
   }, [])
 
-  // Load paquetes on mount and when filters change
+  // Load paquetes on mount and when filters change (página o estado)
   useEffect(() => {
     fetchPaquetes()
-  }, [paginaActual])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginaActual, estado])
+
+  // Al cambiar el estado, volver a la primera página
+  const estadoInicialRef = useRef(true)
+  useEffect(() => {
+    if (estadoInicialRef.current) {
+      estadoInicialRef.current = false
+      return
+    }
+    if (paginaActual !== 0) {
+      setPaginaActual(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado])
 
   const handlePaqueteClick = (paquete: Paquete) => {
     setPaqueteSeleccionado(paquete)
