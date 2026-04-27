@@ -291,7 +291,7 @@ export default function PlotPage() {
         idEstado: estado !== "todos" ? parseInt(estado) : 2,
         idEspecialidades: especialidades.length > 0 ? especialidades : undefined,
         turnoConsulta: turno !== "TODOS" ? turno : undefined,
-        firmado: soloFirmados ? "FIRMADO" : undefined,
+        firmado: soloFirmados ? "FIRMADO" : "NO_FIRMADO",
         usuarioAuditoria: misAuditorias ? extractDocumentFromToken() || undefined : undefined
       }
 

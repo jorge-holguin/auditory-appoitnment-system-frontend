@@ -160,7 +160,7 @@ export async function buscarCitas(params: BuscarCitasParams): Promise<CitaRespon
 
   // Agregar parámetros opcionales si existen
   if (medico && medico !== "todos") {
-    parts.push(`medico=${encodeURIComponent(medico)}`)
+    parts.push(`medicoId=${encodeURIComponent(medico)}`)
   }
   if (turnoConsulta && turnoConsulta !== "TODOS") {
     parts.push(`turnoConsulta=${encodeURIComponent(turnoConsulta)}`)
