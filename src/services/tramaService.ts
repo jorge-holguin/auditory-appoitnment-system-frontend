@@ -569,3 +569,25 @@ export async function eliminarPaqueteSis(numeroPaquete: string, usuario: string)
     throw new Error(`Error al eliminar paquete: ${response.status} ${response.statusText}`)
   }
 }
+
+/**
+ * Reconstruye el ZIP de un paquete ya existente.
+ * GET /api/v1/trama/reconstruir-zip/{numeroPaquete}
+ */
+export async function reconstruirZipPaquete(numeroPaquete: string): Promise<Blob> {
+  const url = `${API_INTEROP_URL}/trama/reconstruir-zip/${encodeURIComponent(numeroPaquete)}`
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "accept": "*/*"
+    }
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Error al reconstruir paquete: ${response.status} ${response.statusText} - ${text}`)
+  }
+
+  return await response.blob()
+}

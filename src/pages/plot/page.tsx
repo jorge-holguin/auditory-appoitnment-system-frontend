@@ -229,10 +229,12 @@ export default function PlotPage() {
 
     if (hayError) {
       const totalErr = errores.length
-      setSuccessMessage(
-        `${siguiente.mensaje || siguiente.error || "El proceso terminó con errores."}` +
-        (totalErr > 0 ? `\n\nSe detectaron errores en ${totalErr} registro(s).` : "")
-      )
+      const msgParts: string[] = []
+      if (siguiente.mensaje) msgParts.push(siguiente.mensaje)
+      if (siguiente.error) msgParts.push(`Código de error: ${siguiente.error}`)
+      if (msgParts.length === 0) msgParts.push("El proceso terminó con errores.")
+      if (totalErr > 0) msgParts.push(`Se detectaron errores en ${totalErr} registro(s).`)
+      setSuccessMessage(msgParts.join("\n\n"))
     } else {
       setSuccessMessage(
         `${siguiente.mensaje || "Proceso completado exitosamente."}\n\n` +
@@ -615,8 +617,7 @@ export default function PlotPage() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Atención</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Especialidad</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Firmado</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
+|                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -945,6 +946,11 @@ export default function PlotPage() {
                         {p.etapaActual ? <>Etapa: <strong>{p.etapaActual}</strong> · </> : null}
                         Estado: <strong>{p.estado}</strong>
                       </p>
+                      {p.error && (
+                        <p className="text-[11px] text-red-600 font-mono truncate mt-0.5" title={p.error}>
+                          {p.error}
+                        </p>
+                      )}
                       <p className="text-[11px] text-gray-400 font-mono truncate mt-0.5">
                         {p.idProceso}
                       </p>

@@ -12,7 +12,7 @@ interface FirmadoSelectorProps {
   label?: string
 }
 
-export function FirmadoSelector({ value, onChange, label = "Firmado" }: FirmadoSelectorProps) {
+export function FirmadoSelector({ value, onChange, label = "Todos" }: FirmadoSelectorProps) {
   return (
     <div>
       {label && (

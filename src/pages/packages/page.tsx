@@ -2,9 +2,11 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye } from "lucide-react"
+import { X, RefreshCw, FilterX, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, Wrench } from "lucide-react"
 import { obtenerCitaIdPorAtencion } from "@/services/citaService"
+import { reconstruirZipPaquete } from "@/services/tramaService"
 import { PdfReviewModal } from "@/components/modals/PdfReviewModal"
+import { useAuth } from "@/components/autentication/AuthProvider"
 // import { eliminarAtencionSis, eliminarPaqueteSis } from "@/services/tramaService"
 // import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 // import { extractDocumentFromToken } from "@/utils/jwtUtils"
@@ -78,11 +80,15 @@ interface VerificacionReglasResponse {
 }
 
 export default function PackagesPage() {
+  const { user } = useAuth()
+  const puedeReconstruir = user?.puesto === "DESARROLLADOR" || user?.puesto === "DEVOPS"
+
   // Estados para el modal de revisión de FUA
   const [modalRevisarOpen, setModalRevisarOpen] = useState(false)
   const [modalCitaId, setModalCitaId] = useState<string>("")
   const [modalDetalle, setModalDetalle] = useState<DetallePaquete | null>(null)
   const [loadingVerAtencion, setLoadingVerAtencion] = useState<string | null>(null)
+  const [reconstruyendoId, setReconstruyendoId] = useState<number | null>(null)
 
   // Función para ver FUA en modal de revisión
   const handleVerAtencion = async (detalle: DetallePaquete) => {
@@ -466,7 +472,44 @@ export default function PackagesPage() {
                               paquete.estado === "ENVIADO" ? "bg-amber-50 border-l-4 border-l-amber-500" : ""
                             }`}
                           >
-                            <td className="px-4 py-3 text-sm">{paquete.codigoPaqueteSis}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span>{paquete.codigoPaqueteSis}</span>
+                                {puedeReconstruir && (
+                                  <button
+                                    type="button"
+                                    title="Reconstruir paquete"
+                                    className="p-1 rounded hover:bg-gray-200 text-gray-600 transition-colors"
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      setReconstruyendoId(paquete.idPaqueteSis)
+                                      try {
+                                        const blob = await reconstruirZipPaquete(paquete.codigoPaqueteSis)
+                                        const url = window.URL.createObjectURL(blob)
+                                        const a = document.createElement("a")
+                                        a.href = url
+                                        a.download = `${paquete.codigoPaqueteSis}.zip`
+                                        document.body.appendChild(a)
+                                        a.click()
+                                        document.body.removeChild(a)
+                                        window.URL.revokeObjectURL(url)
+                                      } catch (err) {
+                                        console.error("Error reconstruyendo paquete:", err)
+                                        alert(err instanceof Error ? err.message : "Error al reconstruir paquete")
+                                      } finally {
+                                        setReconstruyendoId(null)
+                                      }
+                                    }}
+                                  >
+                                    {reconstruyendoId === paquete.idPaqueteSis ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Wrench className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               <span
                                 className={`px-2 py-1 rounded text-xs font-semibold ${
