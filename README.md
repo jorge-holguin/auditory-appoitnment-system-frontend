@@ -407,3 +407,5 @@ npm run dev
 **Hospital José Agurto Tello de Chosica - HJATCH**
 
 Equipo de Desarrollo de Sistemas - Jorge Holguin
+#   p r o y e c t o - c o n e c t a t o n  
+ 
