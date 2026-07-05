@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import { Html5Qrcode } from "html5-qrcode"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IpsViewer } from "@/components/shlink/IpsViewer"
 import { PasscodeDialog } from "@/components/shlink/PasscodeDialog"
+import { QrCameraScanner } from "@/components/qr/QrCameraScanner"
 import {
   AlertCircle,
   Camera,
@@ -19,7 +20,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Upload,
-  VideoOff,
   X,
 } from "lucide-react"
 import {
@@ -58,19 +58,13 @@ interface PatientInfo {
 const DEFAULT_PROF: ProfessionalContext = {
   tipoDocumento: "DNI",
   numeroDocumento: "12345678",
-  ipressId: "20",
-  ipressName: "Hospital José Agurto Tello",
+  nombreCompleto: "",
+  ipressId: "",
+  ipressName: "",
   system: "sihce-angular",
 }
 
-const QR_CAM_ID = "resumen-clinico-qr-cam"
 const QR_IMG_ID = "resumen-clinico-qr-img"
-
-const isCameraAllowed =
-  typeof window !== "undefined" &&
-  (window.location.protocol === "https:" ||
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1")
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -103,10 +97,11 @@ export default function VerResumenClinicoPage() {
   // ── Left panel ────────────────────────────────────────────
   const [scanTab, setScanTab] = useState<"camara" | "imagen">("camara")
   const [cameraActive, setCameraActive] = useState(false)
-  const [cameraError, setCameraError] = useState<string | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const [loadingImage, setLoadingImage] = useState(false)
   const [patient, setPatient] = useState<PatientInfo | null>(null)
+  const [pendingRaw, setPendingRaw] = useState<string | null>(null)
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false)
 
   // ── Right panel ───────────────────────────────────────────
   const [panel, setPanel] = useState<RightPanel>("idle")
@@ -122,71 +117,7 @@ export default function VerResumenClinicoPage() {
   const pendingSession = useRef<{ sessionId: string; token: string } | null>(null)
 
   // Refs
-  const html5QrRef = useRef<Html5Qrcode | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => () => { stopCamera() }, [])
-  useEffect(() => { if (scanTab !== "camara") stopCamera() }, [scanTab])
-
-  // ── QR Camera ─────────────────────────────────────────────
-
-  const stopCamera = async () => {
-    if (html5QrRef.current) {
-      try { if (cameraActive) await html5QrRef.current.stop() } catch { /* ignore */ }
-      html5QrRef.current = null
-    }
-    setCameraActive(false)
-  }
-
-  const onQrDecoded = (raw: string) => {
-    const info = parseQrPayload(raw)
-    stopCamera()
-    if (info.shlinkToken) {
-      const urlDoc = searchParams.get("documento")
-      setPatient({ ...info, dni: urlDoc || info.dni })
-    } else {
-      setSearchParams({ documento: info.dni }, { replace: true })
-    }
-  }
-
-  const handleActivarCamara = async () => {
-    setCameraError(null)
-    if (!isCameraAllowed) { setCameraError("La cámara requiere HTTPS o localhost."); return }
-    try {
-      const qr = new Html5Qrcode(QR_CAM_ID)
-      html5QrRef.current = qr
-      await qr.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        onQrDecoded,
-        () => { /* silent */ }
-      )
-      setCameraActive(true)
-    } catch (err) {
-      const msg = (err instanceof Error ? err.message : "").toLowerCase()
-      setCameraError(
-        msg.includes("permission") || msg.includes("denied")
-          ? "Acceso denegado. Autorice la cámara en su navegador."
-          : "No se pudo acceder a la cámara."
-      )
-    }
-  }
-
-  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageError(null)
-    setLoadingImage(true)
-    try {
-      const result = await new Html5Qrcode(QR_IMG_ID).scanFile(file, false)
-      onQrDecoded(result)
-    } catch {
-      setImageError("No se detectó un QR válido en la imagen.")
-    } finally {
-      setLoadingImage(false)
-      if (fileInputRef.current) fileInputRef.current.value = ""
-    }
-  }
 
   // ── SHLink inline flow ────────────────────────────────────
 
@@ -213,7 +144,7 @@ export default function VerResumenClinicoPage() {
         setPanel("error")
       }
     }
-  }, [patient])
+  }, [searchParams])
 
   const handleVerShlink = useCallback(async (info: PatientInfo) => {
     if (!info.shlinkToken || info.isExpired) return
@@ -235,6 +166,52 @@ export default function VerResumenClinicoPage() {
     }
   }, [runGenerateViewer])
 
+  // ── QR Camera ─────────────────────────────────────────────
+
+  const onQrDecoded = (raw: string) => {
+    setCameraActive(false)
+    setPendingRaw(raw)
+    setShowSuccessOverlay(true)
+  }
+
+  // Process scanned QR after showing success overlay
+  useEffect(() => {
+    if (!pendingRaw || !showSuccessOverlay) return
+    const timeout = globalThis.window.setTimeout(() => {
+      const info = parseQrPayload(pendingRaw)
+      if (info.shlinkToken) {
+        const urlDoc = searchParams.get("documento") || info.dni || ""
+        setPatient({ ...info, dni: urlDoc })
+        // Auto-trigger viewer generation
+        setTimeout(() => handleVerShlink(info), 100)
+      } else if (info.dni?.trim()) {
+        setPatient(info)
+        setSearchParams({ documento: info.dni.trim() }, { replace: true })
+      } else {
+        setPatient(info)
+      }
+      setPendingRaw(null)
+      setShowSuccessOverlay(false)
+    }, 1200) as unknown as number
+    return () => globalThis.window.clearTimeout(timeout)
+  }, [pendingRaw, showSuccessOverlay, searchParams, setSearchParams, handleVerShlink])
+
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageError(null)
+    setLoadingImage(true)
+    try {
+      const result = await new Html5Qrcode(QR_IMG_ID).scanFile(file, false)
+      onQrDecoded(result)
+    } catch {
+      setImageError("No se detectó un QR válido en la imagen.")
+    } finally {
+      setLoadingImage(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────
 
   return (
@@ -253,14 +230,22 @@ export default function VerResumenClinicoPage() {
         </div>
       </div>
 
-      {/* Body: two columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 flex-1 min-h-0 items-start">
+      {/* Body: adaptive layout
+          - idle / processing: single column with large scanner as main content
+          - patient detected: two columns (patient card + right panel)
+          - viewer ready: full width viewer
+      */}
+      <div className={`grid gap-4 flex-1 min-h-0 ${
+        panel === "shlink_ready" || panel === "shlink_validating" || panel === "shlink_loading"
+          ? "grid-cols-1"
+          : patient
+            ? "grid-cols-1 lg:grid-cols-[320px_1fr]"
+            : "grid-cols-1"
+      }`}>
 
-        {/* ── Left Panel ──────────────────────────────── */}
-        <div className="flex flex-col gap-3">
-
-          {/* Patient card (post-scan) */}
-          {patient ? (
+        {/* ── Left Panel: Patient card only (when available) ── */}
+        {patient && panel !== "shlink_ready" && panel !== "shlink_validating" && panel !== "shlink_loading" && (
+          <div className="flex flex-col gap-3 animate-in fade-in zoom-in slide-in-from-bottom-4 duration-500">
             <div className="bg-white rounded-2xl border border-[#9CD2D3]/30 shadow-sm overflow-hidden">
               <div className={`px-4 py-2.5 flex items-center justify-between border-b ${patient.isExpired ? "bg-red-50 border-red-200/60" : "bg-gradient-to-r from-[#EBF6FA] to-[#EEF0FA] border-[#9CD2D3]/20"}`}>
                 <div className="flex items-center gap-1.5">
@@ -298,11 +283,6 @@ export default function VerResumenClinicoPage() {
                   </div>
                 )}
                 <div className="flex flex-col gap-2 pt-1">
-                  {patient.shlinkToken && !patient.isExpired && (
-                    <Button size="sm" onClick={() => handleVerShlink(patient)} className="w-full bg-gradient-to-r from-[#00A591] to-[#00866E] hover:from-[#007a6d] hover:to-[#006656] text-white text-xs h-8 gap-1.5">
-                      <FileCheck className="w-3.5 h-3.5" /> Ver Resumen SHLink
-                    </Button>
-                  )}
                   <Button
                     size="sm"
                     onClick={() => navigate(`/documentos-ips?documento=${patient.dni}`)}
@@ -313,45 +293,44 @@ export default function VerResumenClinicoPage() {
                 </div>
               </div>
             </div>
-          ) : (
-            /* QR Scanner card */
-            <div className="bg-white rounded-2xl border border-[#9CD2D3]/30 shadow-sm overflow-hidden">
+          </div>
+        )}
+
+        {/* ── Main Panel: scanner / processing / viewer ── */}
+        <div className={`bg-white rounded-2xl border border-[#9CD2D3]/30 shadow-sm overflow-hidden flex flex-col h-full ${
+          patient ? "min-h-[420px]" : "min-h-[600px]"
+        }`}>
+
+          {panel === "idle" && !patient && !showSuccessOverlay && (
+            <div className="flex-1 flex flex-col h-full">
               <div className="px-5 py-4 border-b border-[#9CD2D3]/20">
                 <div className="flex items-center gap-2">
                   <QrCode className="w-4 h-4 text-[#4F9BB6]" />
                   <p className="text-sm font-semibold text-[#114C5F]">Leer código QR</p>
                 </div>
-                <p className="text-xs text-[#114C5F]/50 mt-0.5">Escanee el QR del paciente para identificarlo</p>
+                <p className="text-xs text-[#114C5F]/50 mt-0.5">Escanee el QR del paciente para ver su resumen clínico</p>
               </div>
-              <div className="px-5 py-4">
-                <Tabs value={scanTab} onValueChange={(v) => setScanTab(v as "camara" | "imagen")}>
-                  <TabsList className="grid grid-cols-2 bg-slate-100 h-8 w-full">
+              <div className="flex-1 px-5 py-4 min-h-0">
+                <Tabs value={scanTab} onValueChange={(v) => setScanTab(v as "camara" | "imagen")} className="h-full flex flex-col">
+                  <TabsList className="grid grid-cols-2 bg-slate-100 h-8 w-full sm:w-64">
                     <TabsTrigger value="camara" className="text-xs gap-1.5 h-7"><Camera className="w-3 h-3" /> Cámara</TabsTrigger>
                     <TabsTrigger value="imagen" className="text-xs gap-1.5 h-7"><ImageIcon className="w-3 h-3" /> Imagen</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="camara" className="mt-3 space-y-2">
-                    <div id={QR_CAM_ID} className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center" style={{ minHeight: 180 }}>
-                      {!cameraActive && (
-                        <div className="flex flex-col items-center gap-2 text-slate-400 py-6 text-center">
-                          <VideoOff className="w-7 h-7 opacity-30" />
-                          <p className="text-xs">{isCameraAllowed ? "Clic en Activar para escanear" : "⚠️ Cámara no disponible en HTTP"}</p>
-                        </div>
-                      )}
+                  <TabsContent value="camara" className="mt-3 flex-1 min-h-0">
+                    <div className="h-full min-h-[420px] sm:min-h-[540px] lg:min-h-[620px]">
+                      <QrCameraScanner
+                        active={cameraActive && scanTab === "camara"}
+                        onResult={onQrDecoded}
+                        onActivate={() => setCameraActive(true)}
+                        onDeactivate={() => setCameraActive(false)}
+                      />
                     </div>
-                    {cameraError && (
-                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
-                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /><span>{cameraError}</span>
-                      </div>
-                    )}
-                    <Button size="sm" className={`w-full gap-1.5 text-xs h-8 ${cameraActive ? "bg-red-500 hover:bg-red-600" : "bg-[#00B09B] hover:bg-[#00957f]"} text-white`} onClick={cameraActive ? stopCamera : handleActivarCamara}>
-                      <Camera className="w-3.5 h-3.5" />{cameraActive ? "Detener cámara" : "Activar cámara"}
-                    </Button>
                   </TabsContent>
 
-                  <TabsContent value="imagen" className="mt-3 space-y-2">
-                    <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-100 transition-colors py-8" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-7 h-7 text-slate-300" />
+                  <TabsContent value="imagen" className="mt-3 space-y-2 flex-1">
+                    <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-100 transition-colors py-10 sm:py-16" onClick={() => fileInputRef.current?.click()}>
+                      <Upload className="w-8 h-8 text-slate-300" />
                       <p className="text-xs text-slate-500 font-medium">Subir imagen del QR</p>
                       <p className="text-[10px] text-slate-400">PNG, JPG, WEBP</p>
                     </div>
@@ -372,20 +351,37 @@ export default function VerResumenClinicoPage() {
             </div>
           )}
 
-        </div>
-
-        {/* ── Right Panel ─────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-[#9CD2D3]/30 shadow-sm overflow-hidden flex flex-col min-h-[420px]">
-
-          {panel === "idle" && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8 py-16">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#EBF6FA] to-[#EEF0FA] flex items-center justify-center">
-                <QrCode className="w-8 h-8 text-[#4F9BB6]/50" />
+          {(showSuccessOverlay || (patient?.shlinkToken && panel === "idle")) && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-5 py-8 animate-in zoom-in fade-in duration-300">
+              <div className="rounded-full bg-[#00B09B]/10 p-5 animate-pulse">
+                <QrCode className="w-12 h-12 text-[#00B09B]" />
               </div>
               <div>
-                <p className="font-semibold text-[#114C5F] text-sm">Identifique al paciente</p>
-                <p className="text-xs text-[#114C5F]/50 mt-1 max-w-xs">Escanee el QR del paciente o busque por número de documento para ver su historial clínico.</p>
+                <p className="text-lg font-bold text-[#114C5F]">QR detectado</p>
+                <p className="text-xs text-[#114C5F]/60 mt-0.5">Procesando información del paciente…</p>
               </div>
+              <div className="w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-[#00B09B] w-2/3 animate-pulse rounded-full" />
+              </div>
+            </div>
+          )}
+
+          {patient && panel === "idle" && !patient.shlinkToken && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-5 py-8 animate-in fade-in zoom-in duration-500">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#EBF6FA] to-[#EEF0FA] flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-[#114C5F] text-sm">DNI identificado</p>
+                <p className="text-xs text-[#114C5F]/50 mt-1 max-w-xs">Paciente: <span className="font-mono font-medium">{patient.dni}</span></p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => navigate(`/documentos-ips?documento=${patient.dni}`)}
+                className="bg-gradient-to-r from-[#4F9BB6] to-[#4A6EB0] hover:from-[#3d8aa5] hover:to-[#3a5da0] text-white text-xs h-8 gap-1.5"
+              >
+                <ClipboardList className="w-3.5 h-3.5" /> Ver documentos IPS
+              </Button>
             </div>
           )}
 
@@ -408,12 +404,30 @@ export default function VerResumenClinicoPage() {
 
           {panel === "shlink_ready" && (
             <div className="flex flex-col h-full">
-              <div className="px-5 py-3 border-b border-[#9CD2D3]/20 flex items-center gap-2.5 flex-shrink-0">
-                <FileCheck className="w-4 h-4 text-[#00A591]" />
-                <span className="text-sm font-semibold text-[#114C5F]">Resumen SHLink</span>
-                {currentDni && <span className="text-xs text-[#114C5F]/50 font-mono">· DNI {currentDni}</span>}
+              <div className="px-5 py-3 border-b border-[#9CD2D3]/20 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <FileCheck className="w-4 h-4 text-[#00A591]" />
+                  <span className="text-sm font-semibold text-[#114C5F]">Resumen SHLink</span>
+                  {currentDni && <span className="text-xs text-[#114C5F]/50 font-mono">· DNI {currentDni}</span>}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPanel("idle")
+                    setPatient(null)
+                    setViewerUrl(null)
+                    setShowPasscode(false)
+                    setPasscodeError(null)
+                    setPasscodeLoading(false)
+                    pendingSession.current = null
+                  }}
+                  className="gap-1.5 text-xs h-7 border-[#9CD2D3]/40 text-[#114C5F]/70 hover:bg-[#EBF6FA]"
+                >
+                  <QrCode className="w-3 h-3" /> Nuevo escaneo
+                </Button>
               </div>
-              <div className="flex-1 min-h-[500px]">
+              <div className="flex-1 min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]">
                 <IpsViewer viewerUrl={viewerUrl} expiresInSeconds={viewerExpiry} onExpired={() => { setPanel("error"); setErrorMessage("Sesión expirada. Solicite un nuevo QR.") }} />
               </div>
             </div>

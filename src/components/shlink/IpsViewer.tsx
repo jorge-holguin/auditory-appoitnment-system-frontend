@@ -12,7 +12,7 @@ const htmlCache = new Map<string, string>()
 const fetchCache = new Map<string, Promise<string>>()
 
 async function fetchViewerHtml(viewerUrl: string): Promise<string> {
-  const response = await fetch(viewerUrl)
+  const response = await fetch(viewerUrl, { credentials: "include" })
   if (!response.ok) {
     const body = await response.text().catch(() => "")
     throw new Error(`Error ${response.status}: ${response.statusText}${body ? ` — ${body.slice(0, 200)}` : ""}`)
@@ -122,14 +122,15 @@ export function IpsViewer({ viewerUrl, expiresInSeconds = 1500, onExpired }: Ips
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden select-none"
+      className="relative w-full h-full min-h-[400px] overflow-hidden select-none"
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
     >
       <iframe
         src={blobUrl}
-        className="absolute inset-0 w-full h-full border-none"
+        className="absolute inset-0 w-full h-full min-h-[400px] border-none"
         referrerPolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
         title="Resumen de Salud del Paciente - RENHICE"
       />
     </div>

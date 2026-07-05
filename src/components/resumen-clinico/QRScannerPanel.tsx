@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import { Html5Qrcode } from "html5-qrcode"
-import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -8,7 +7,6 @@ import {
   Camera,
   CheckCircle2,
   Clock,
-  Eye,
   ImageIcon,
   KeyRound,
   ShieldCheck,
@@ -72,7 +70,6 @@ const isCameraAllowed =
 const CAMERA_DIV_ID = "qr-panel-camera-reader"
 
 export function QRScannerPanel({ onResult, onBuscar }: QRScannerPanelProps) {
-  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<"camara" | "imagen">("camara")
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -152,13 +149,10 @@ export function QRScannerPanel({ onResult, onBuscar }: QRScannerPanelProps) {
 
         {/* Tab: Cámara */}
         <TabsContent value="camara" className="mt-3 space-y-3">
-          <div
-            id={CAMERA_DIV_ID}
-            className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center"
-            style={{ minHeight: 200 }}
-          >
+          <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden" style={{ minHeight: 200 }}>
+            <div id={CAMERA_DIV_ID} style={{ minHeight: 200 }} />
             {!cameraActive && (
-              <div className="flex flex-col items-center gap-2 text-slate-400 py-8 px-4 text-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 py-8 px-4 text-center pointer-events-none">
                 <VideoOff className="w-8 h-8 opacity-40" />
                 <p className="text-xs">
                   {isCameraAllowed
@@ -288,15 +282,6 @@ export function QRScannerPanel({ onResult, onBuscar }: QRScannerPanelProps) {
             </div>
 
             <div className="flex flex-col gap-2 flex-shrink-0">
-              {patientInfo.shlinkToken && !patientInfo.isExpired && (
-                <Button
-                  size="sm"
-                  onClick={() => navigate(`/shlink/viewer?token=${encodeURIComponent(patientInfo.shlinkToken!)}`)}
-                  className="bg-[#00A591] hover:bg-[#007a6d] text-white text-xs h-8 flex-shrink-0 gap-1.5"
-                >
-                  <Eye className="w-3.5 h-3.5" /> Ver Resumen SHLink
-                </Button>
-              )}
               <Button
                 size="sm"
                 onClick={() => {

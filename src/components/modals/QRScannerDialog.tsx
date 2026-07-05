@@ -175,13 +175,10 @@ export function QRScannerDialog({ open, onOpenChange, onResult }: QRScannerDialo
                 </p>
 
                 {/* Viewport */}
-                <div
-                  id={CAMERA_DIV_ID}
-                  className="flex-1 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center"
-                  style={{ minHeight: 220 }}
-                >
+                <div className="relative flex-1 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden" style={{ minHeight: 220 }}>
+                  <div id={CAMERA_DIV_ID} style={{ minHeight: 220 }} />
                   {!cameraActive && (
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 pointer-events-none">
                       <VideoOff className="w-10 h-10 opacity-40" />
                       <p className="text-xs">La cámara se activará al hacer clic en el botón</p>
                     </div>

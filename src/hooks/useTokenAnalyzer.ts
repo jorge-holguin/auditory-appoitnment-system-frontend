@@ -28,16 +28,38 @@ function decodeJwtPayload(token: string): ShlinkJwtPayload | null {
 
 /**
  * Extrae el JWT de una URL de tipo SHLink.
- * Formato: https://...#shlink:/token=JWT&exp=...&flag=...
+ * Soporta formatos:
+ *   - https://...#shlink:/token=JWT&exp=...&flag=...
+ *   - shlink:/token=JWT&exp=...
+ *   - JWT directo (3 partes base64url separadas por puntos)
  */
 export function extractShlinkToken(url: string): string | null {
   try {
-    const hashIdx = url.indexOf("#")
-    if (hashIdx === -1) return null
-    const fragment = url.slice(hashIdx + 1)
-    if (!fragment.startsWith("shlink:/")) return null
-    const params = new URLSearchParams(fragment.replace(/^shlink:\//, ""))
-    return params.get("token")
+    const trimmed = url.trim()
+
+    // 1. Formato completo con #shlink:/token=...
+    const hashIdx = trimmed.indexOf("#")
+    if (hashIdx !== -1) {
+      const fragment = trimmed.slice(hashIdx + 1)
+      if (fragment.startsWith("shlink:/")) {
+        const params = new URLSearchParams(fragment.replace(/^shlink:\//, ""))
+        const token = params.get("token")
+        if (token) return token
+      }
+    }
+
+    // 2. Fragmento shlink:/ sin #
+    const shlinkMatch = trimmed.match(/shlink:\/token=([^&\s]+)/)
+    if (shlinkMatch?.[1]) return shlinkMatch[1]
+
+    // 3. JWT directo embebido en cualquier parte del string
+    const jwtMatch = trimmed.match(/\b([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/)
+    if (jwtMatch?.[1]) {
+      const parts = jwtMatch[1].split(".")
+      if (parts.length === 3 && parts.every((p) => p.length > 0)) return jwtMatch[1]
+    }
+
+    return null
   } catch {
     return null
   }
@@ -108,6 +130,7 @@ export async function validateToken(
       "Content-Type": "application/json",
       Accept: "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ token }),
   })
   if (!response.ok) {
@@ -170,6 +193,7 @@ export async function generateViewer(
   const response = await fetch(`${fhirUrl}/shlink/${sessionId}/generate-viewer`, {
     method: "POST",
     headers,
+    credentials: "include",
     body: JSON.stringify({}),
   })
 
