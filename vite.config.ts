@@ -15,7 +15,30 @@ export default defineConfig({
     include: ['react', 'react-dom'],
   },
   server: {
-    host: "192.168.5.239",
-    port: 3005
+    host: true,
+    port: 3005,
+    strictPort: false,
+    proxy: {
+      '/auth-service': {
+        target: 'https://datuq.minsa.gob.pe',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('origin', 'https://datuq.minsa.gob.pe')
+          })
+        },
+      },
+      '/fhir-service': {
+        target: 'https://datuq.minsa.gob.pe',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('origin', 'https://datuq.minsa.gob.pe')
+          })
+        },
+      },
+    },
   }
 })

@@ -60,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userInfo = getCurrentUser();
     setUser(userInfo);
     
-    // Redirect to audit page (no password change implementation needed)
-    navigate('/audit');
+    // Redirect to consulta externa page (no password change implementation needed)
+    navigate('/consulta-externa');
   };
 
   const logout = () => {

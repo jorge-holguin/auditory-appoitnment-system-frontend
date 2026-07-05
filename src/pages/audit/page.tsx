@@ -34,7 +34,7 @@ const esCustom = {
 // Registrar locale español personalizado para DatePicker
 registerLocale('es', esCustom)
 
-export default function AuditPage() {
+export default function ConsultaExternaPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   // Multi-selección de especialidades. Se llena automáticamente con todas al cargar (selectAllByDefault).
   const [especialidadesSel, setEspecialidadesSel] = useState<string[]>([])
@@ -345,7 +345,7 @@ export default function AuditPage() {
       <div className="bg-white rounded-xl shadow-sm border border-[#9CD2D3]/30 p-8">
         {/* Header con título y botones */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-[#9CD2D3]/20">
-          <h1 className="text-2xl font-semibold text-[#114C5F]">Lista de Atenciones por Auditar</h1>
+          <h1 className="text-2xl font-semibold text-[#114C5F]">Consulta Externa</h1>
           <div className="flex gap-3">
             <Button onClick={handleActualizar} className="text-white bg-[#4F9BB6] hover:bg-[#4A6EB0] hover:to-[#4F9BB6] shadow-md">
               <RefreshCw className="w-4 h-4 mr-2" />

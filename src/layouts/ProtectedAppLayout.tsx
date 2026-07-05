@@ -6,7 +6,7 @@ export default function ProtectedAppLayout() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
       {/* Navbar - Full width at top */}
-      <Navbar title="Módulo de Generación de Tramas" subtitle="HOSPITAL JOSÉ AGURTO TELLO DE CHOSICA - HJATCH" />
+      <Navbar title="Módulo de Consulta Externa" subtitle="HOSPITAL JOSÉ AGURTO TELLO DE CHOSICA - HJATCH" />
       
       {/* Content area with sidebar */}
       <div className="flex flex-1 overflow-hidden">

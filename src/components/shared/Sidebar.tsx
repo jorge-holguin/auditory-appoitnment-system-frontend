@@ -1,28 +1,23 @@
 import { NavLink } from "react-router-dom"
-import { ShieldCheck, Layers, Package, FileBarChart } from "lucide-react"
+import { Stethoscope, ClipboardList, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
   const menuItems = [
     {
-      title: "Auditoría",
-      url: "/audit",
-      icon: ShieldCheck,
+      title: "Consulta externa",
+      url: "/consulta-externa",
+      icon: Stethoscope,
     },
     {
-      title: "Tramas",
-      url: "/plot",
-      icon: Layers,
+      title: "Ver Resumen Clínico",
+      url: "/resumen-clinico",
+      icon: ClipboardList,
     },
     {
-      title: "Paquetes",
-      url: "/packages",
-      icon: Package,
-    },
-    {
-      title: "Reportes",
-      url: "/report",
-      icon: FileBarChart,
+      title: "Documentos IPS",
+      url: "/documentos-ips",
+      icon: FileText,
     },
   ]
 
