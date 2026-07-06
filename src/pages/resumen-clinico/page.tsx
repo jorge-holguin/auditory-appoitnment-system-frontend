@@ -61,7 +61,7 @@ const DEFAULT_PROF: ProfessionalContext = {
   nombreCompleto: "",
   ipressId: "",
   ipressName: "",
-  system: "sihce-angular",
+  system: "sigsalud-react",
 }
 
 const QR_IMG_ID = "resumen-clinico-qr-img"

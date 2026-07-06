@@ -166,7 +166,7 @@ export function withDefaultProfessionalContext(
   return {
     ...prof,
     numeroDocumento: prof.numeroDocumento.trim() || "12345678",
-    system: "sihce-angular",
+    system: "sigsalud-react",
   }
 }
 

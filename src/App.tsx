@@ -15,6 +15,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
+          {/* Public route */}
+          <Route path="/resumen-clinico" element={<VerResumenClinicoPage />} />
+
           {/* Protected area with shared layout */}
           <Route
             element={
@@ -24,7 +27,6 @@ function App() {
             }
           >
             <Route path="/consulta-externa" element={<ConsultaExternaPage />} />
-            <Route path="/resumen-clinico" element={<VerResumenClinicoPage />} />
             <Route path="/documentos-ips" element={<DocumentosIpsPage />} />
             <Route path="/shlink/viewer" element={<ShlinkViewerPage />} />
           </Route>
